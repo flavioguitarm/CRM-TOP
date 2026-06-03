@@ -1,0 +1,7 @@
+{
+  "name": "CRM TOP Formaturas",
+  "description": "Um CRM completo para gestão de formaturas, com funil de vendas Kanban, dashboards de performance, controle de turmas, instituições e permissões de acesso hierárquicas.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
