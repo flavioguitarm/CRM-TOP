@@ -130,6 +130,56 @@ function mapClassRow(row: any): ClassRoom {
   };
 }
 
+// ── Mapper: linha do Supabase → Client ────────────────────────────────────
+function mapClientRow(row: any): Client {
+  return {
+    id:             row.id,
+    name:           row.name ?? '',
+    birthDate:      row.birth_date ?? '',
+    gender:         row.gender ?? '',
+    cpf:            row.cpf ?? '',
+    email:          row.email ?? '',
+    phone:          row.phone ?? '',
+    institutionId:  row.institution_id ?? '',
+    campus:         row.campus ?? '',
+    courseId:       row.course_id ?? '',
+    classId:        row.class_id ?? '',
+    shift:          row.shift ?? '',
+    funnelId:       row.funnel_id ?? '',
+    stageId:        row.stage_id ?? '',
+    tags:           row.tags ?? [],
+    totalValue:     row.total_value ?? 0,
+    purchasesCount: row.purchases_count ?? 0,
+    sellerId:       row.seller_id ?? '',
+    createdAt:      row.created_at?.split('T')[0] ?? '',
+    activities:     (row.client_activities ?? []).map((a: any) => ({
+      id:          a.id,
+      type:        a.type,
+      description: a.description ?? '',
+      timestamp:   a.timestamp ?? '',
+      attachments: a.attachments ?? [],
+    })),
+  };
+}
+
+// ── Mapper: linha do Supabase → Funnel ────────────────────────────────────
+function mapFunnelRow(row: any): Funnel {
+  return {
+    id:   row.id,
+    name: row.name ?? '',
+    stages: (row.funnel_stages ?? [])
+      .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+      .map((s: any) => ({
+        id:    s.id,
+        name:  s.name ?? '',
+        order: s.order ?? 0,
+        color: s.color ?? undefined,
+        type:  s.type ?? 'NORMAL',
+      })),
+    responsibleUserIds: (row.funnel_responsible_users ?? []).map((r: any) => r.user_id),
+  };
+}
+
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -162,12 +212,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const [users, setUsers] = useState<User[]>(() => load('users', MOCK_USERS));
-  const [clients, setClients] = useState<Client[]>(() => load('clients', MOCK_CLIENTS));
 
   // ── Entidades migradas para Supabase (sem localStorage) ──────────────────
+  const [clients, setClients]           = useState<Client[]>([]);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [classes, setClasses] = useState<ClassRoom[]>([]);
+  const [courses, setCourses]           = useState<Course[]>([]);
+  const [classes, setClasses]           = useState<ClassRoom[]>([]);
+  const [funnels, setFunnels]           = useState<Funnel[]>([]);
 
   // Fetch: institutions
   useEffect(() => {
@@ -226,13 +277,51 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setClasses((data ?? []).map(mapClassRow));
       });
   }, [tenantId]);
+
+  // Fetch: clients (com atividades)
+  useEffect(() => {
+    if (!tenantId) { setClients([]); return; }
+    supabase
+      .from('clients')
+      .select(`
+        id, name, birth_date, gender, cpf, email, phone,
+        institution_id, campus, course_id, class_id, shift,
+        funnel_id, stage_id, tags, total_value, purchases_count,
+        seller_id, created_at,
+        client_activities(id, type, description, timestamp, attachments)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('clients fetch:', error.message); return; }
+        setClients((data ?? []).map(mapClientRow));
+      });
+  }, [tenantId]);
+
+  // Fetch: funnels (com etapas e responsáveis)
+  useEffect(() => {
+    if (!tenantId) { setFunnels([]); return; }
+    supabase
+      .from('funnels')
+      .select(`
+        id, name,
+        funnel_stages(id, name, order, color, type),
+        funnel_responsible_users(user_id)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('funnels fetch:', error.message); return; }
+        setFunnels((data ?? []).map(mapFunnelRow));
+      });
+  }, [tenantId]);
+
   const [productCategories, setProductCategories] = useState<ProductCategory[]>(() => load('productCategories', [
     { id: 'cat-1', name: 'Adesão', createdAt: today },
     { id: 'cat-2', name: 'Convite Extra', createdAt: today },
     { id: 'cat-3', name: 'Mesa Extra', createdAt: today }
   ]));
   const [products, setProducts] = useState<Product[]>(() => load('products', MOCK_PRODUCTS));
-  const [funnels, setFunnels] = useState<Funnel[]>(() => load('funnels', MOCK_FUNNELS));
   const [events, setEvents] = useState<Event[]>(() => load('events', MOCK_EVENTS));
   const [tasks, setTasks] = useState<Task[]>(() => load('tasks', []));
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>(() => load('activityTypes', MOCK_ACTIVITY_TYPES));
@@ -250,16 +339,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
 
-    // institutions, courses e classes são agora persistidas no Supabase — não gravar em localStorage
+    // institutions, courses, classes, clients e funnels são persistidos no Supabase
     const dataMap = {
-      users, clients, productCategories,
-      products, funnels, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
+      users, productCategories,
+      products, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
     };
 
     Object.entries(dataMap).forEach(([key, value]) => {
       localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
     });
-  }, [users, clients, productCategories, products, funnels, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
+  }, [users, productCategories, products, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
 
   const syncWithGoogleSheet = async () => {
     if (!googleSheetUrl) return;
@@ -362,13 +451,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (tenantId) ids.forEach(id => supabase.from('classes').delete().eq('id', id).eq('tenant_id', tenantId).then());
           handleRemoval(classes, setClasses, 'name');
           break;
+        case 'funnel':
+          if (tenantId) ids.forEach(id => supabase.from('funnels').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(funnels, setFunnels, 'name');
+          break;
+        case 'client':
+          if (tenantId) ids.forEach(id => supabase.from('clients').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(clients, setClients, 'name');
+          break;
         case 'product': handleRemoval(products, setProducts, 'name'); break;
         case 'productCategory': handleRemoval(productCategories, setProductCategories, 'name'); break;
         case 'user': handleRemoval(users, setUsers, 'name'); break;
-        case 'funnel': handleRemoval(funnels, setFunnels, 'name'); break;
         case 'event': handleRemoval(events, setEvents, 'name'); break;
         case 'activityType': handleRemoval(activityTypes, setActivityTypes, 'name'); break;
-        case 'client': handleRemoval(clients, setClients, 'name'); break;
         case 'csAction': handleRemoval(csActions, setCsActions, 'type'); break;
         case 'csDailyService': handleRemoval(csDailyServices, setCsDailyServices, 'summary'); break;
     }
@@ -422,13 +517,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           setClasses(p => [...p, restoredData]);
           break;
+        case 'funnel':
+          if (tenantId) {
+            supabase.from('funnels')
+              .insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name })
+              .then(async ({ error }) => {
+                if (error) { console.error('restore funnel:', error.message); return; }
+                await persistFunnelRelations(restoredData as Funnel, tenantId);
+              });
+          }
+          setFunnels(p => [...p, restoredData]);
+          break;
+        case 'client':
+          if (tenantId) {
+            supabase.from('clients').insert(clientPayload(restoredData as Client, tenantId))
+              .then(({ error }) => { if (error) console.error('restore client:', error.message); });
+          }
+          setClients(p => [...p, restoredData]);
+          break;
         case 'product': setProducts(p => [...p, restoredData]); break;
         case 'productCategory': setProductCategories(p => [...p, restoredData]); break;
         case 'user': setUsers(p => [...p, restoredData]); break;
-        case 'funnel': setFunnels(p => [...p, restoredData]); break;
         case 'event': setEvents(p => [...p, restoredData]); break;
         case 'activityType': setActivityTypes(p => [...p, restoredData]); break;
-        case 'client': setClients(p => [...p, restoredData]); break;
         case 'csAction': setCsActions(p => [...p, restoredData]); break;
         case 'csDailyService': setCsDailyServices(p => [...p, restoredData]); break;
     }
@@ -454,16 +565,56 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateClientStage = (clientId: string, newStageId: string) => {
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, stageId: newStageId } : c));
+    if (tenantId) {
+      supabase.from('clients')
+        .update({ stage_id: newStageId })
+        .eq('id', clientId).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateClientStage:', error.message); });
+    }
   };
 
   const addClientActivity = (clientId: string, activity: any) => {
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, activities: [activity, ...c.activities] } : c));
+    if (tenantId) {
+      supabase.from('client_activities').insert({
+        id:          activity.id || `act-${Date.now()}`,
+        tenant_id:   tenantId,
+        client_id:   clientId,
+        type:        activity.type,
+        description: activity.description ?? '',
+        timestamp:   new Date().toISOString(),
+        attachments: activity.attachments ?? [],
+      }).then(({ error }) => { if (error) console.error('addClientActivity:', error.message); });
+    }
   };
+
+  // Helper interno: monta o payload de insert/update de clients para o Supabase
+  const clientPayload = (c: Client, tid: string) => ({
+    id:              c.id,
+    tenant_id:       tid,
+    name:            c.name,
+    birth_date:      c.birthDate   || null,
+    gender:          c.gender      || null,
+    cpf:             c.cpf         || null,
+    email:           c.email       || null,
+    phone:           c.phone       || null,
+    institution_id:  c.institutionId || null,
+    campus:          c.campus      || null,
+    course_id:       c.courseId    || null,
+    class_id:        c.classId     || null,
+    shift:           c.shift       || null,
+    funnel_id:       c.funnelId    || null,
+    stage_id:        c.stageId     || null,
+    tags:            c.tags        ?? [],
+    total_value:     c.totalValue  ?? 0,
+    purchases_count: c.purchasesCount ?? 0,
+    seller_id:       c.sellerId    || null,
+  });
 
   const addClient = (client: Client) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const newClient = { ...client, createdAt: client.createdAt || todayStr };
-    
+
     // Varredura retroativa por atendimentos diários CS órfãos (apenas com telefone)
     const orphans = csDailyServices.filter(s => s.clientPhone === client.phone && !s.clientId);
     const orphanActivities: Activity[] = orphans.map(o => ({
@@ -473,16 +624,44 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         timestamp: new Date(o.createdAt).toLocaleString('pt-BR')
     }));
 
-    // Se encontrou órfãos, vincula-os ao novo cliente e adiciona ao histórico dele
     if (orphans.length > 0) {
         newClient.activities = [...orphanActivities, ...newClient.activities];
         setCsDailyServices(prev => prev.map(s => s.clientPhone === client.phone ? { ...s, clientId: newClient.id } : s));
     }
 
     setClients(prev => [newClient, ...prev]);
+
+    // Persiste no Supabase (fire-and-forget)
+    if (tenantId) {
+      supabase.from('clients').insert(clientPayload(newClient, tenantId))
+        .then(({ error }) => { if (error) console.error('addClient:', error.message); });
+
+      if (newClient.activities?.length) {
+        supabase.from('client_activities').insert(
+          newClient.activities.map(a => ({
+            id:          a.id,
+            tenant_id:   tenantId,
+            client_id:   newClient.id,
+            type:        a.type,
+            description: a.description ?? '',
+            timestamp:   new Date().toISOString(),
+            attachments: a.attachments ?? [],
+          }))
+        ).then(({ error }) => { if (error) console.error('addClient activities:', error.message); });
+      }
+    }
   };
 
-  const updateClient = (client: Client) => setClients(prev => prev.map(c => c.id === client.id ? client : c));
+  const updateClient = (client: Client) => {
+    setClients(prev => prev.map(c => c.id === client.id ? client : c));
+    if (tenantId) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id, tenant_id: _tid, ...payload } = clientPayload(client, tenantId) as any;
+      supabase.from('clients').update(payload)
+        .eq('id', client.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateClient:', error.message); });
+    }
+  };
   
   // ── institutions ────────────────────────────────────────────────────────────
 
@@ -649,8 +828,56 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setEvents(prev => prev.map(e => e.id === eventId ? { ...e, activities: [activity, ...(e.activities || [])] } : e));
   };
 
-  const updateFunnel = (funnel: Funnel) => setFunnels(prev => prev.map(f => f.id === funnel.id ? funnel : f));
-  const addFunnel = (funnel: Funnel) => setFunnels(prev => [...prev, funnel]);
+  // Helper: insere stages + responsáveis no Supabase para um funil
+  const persistFunnelRelations = async (funnel: Funnel, tid: string) => {
+    if (funnel.stages?.length) {
+      await supabase.from('funnel_stages').insert(
+        funnel.stages.map(s => ({
+          id:        s.id,
+          tenant_id: tid,
+          funnel_id: funnel.id,
+          name:      s.name,
+          order:     s.order,
+          color:     s.color ?? null,
+          type:      s.type ?? 'NORMAL',
+        }))
+      );
+    }
+    if (funnel.responsibleUserIds?.length) {
+      await supabase.from('funnel_responsible_users').insert(
+        funnel.responsibleUserIds.map(uid => ({ funnel_id: funnel.id, user_id: uid }))
+      );
+    }
+  };
+
+  const addFunnel = (funnel: Funnel) => {
+    setFunnels(prev => [...prev, funnel]);
+    if (tenantId) {
+      supabase.from('funnels')
+        .insert({ id: funnel.id, tenant_id: tenantId, name: funnel.name })
+        .then(async ({ error }) => {
+          if (error) { console.error('addFunnel:', error.message); return; }
+          await persistFunnelRelations(funnel, tenantId);
+        });
+    }
+  };
+
+  const updateFunnel = (funnel: Funnel) => {
+    setFunnels(prev => prev.map(f => f.id === funnel.id ? funnel : f));
+    if (tenantId) {
+      supabase.from('funnels')
+        .update({ name: funnel.name })
+        .eq('id', funnel.id).eq('tenant_id', tenantId)
+        .then(async ({ error }) => {
+          if (error) { console.error('updateFunnel:', error.message); return; }
+          // Re-sincroniza estágios e responsáveis (delete + re-insert)
+          await supabase.from('funnel_stages').delete().eq('funnel_id', funnel.id);
+          await supabase.from('funnel_responsible_users').delete().eq('funnel_id', funnel.id);
+          await persistFunnelRelations(funnel, tenantId);
+        });
+    }
+  };
+
   const deleteFunnel = (id: string) => moveToTrash('funnel', [id]);
   const isStageOccupied = (stageId: string) => clients.some(c => c.stageId === stageId);
 
