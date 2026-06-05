@@ -242,7 +242,7 @@ const EventosAdmin: React.FC = () => {
     data.forEach(item => {
       addEvent({
         ...item,
-        id: `evt-${Date.now()}-${Math.random()}`,
+        id: crypto.randomUUID(),
         status: item.status || 'Previsão',
         activities: []
       } as Event);
@@ -506,7 +506,7 @@ const EventosAdmin: React.FC = () => {
         )}
       </div>
 
-      {modalOpen && <EventModal event={itemToEdit} onClose={() => setModalOpen(false)} onSave={(d) => { if(itemToEdit) updateEvent({...itemToEdit, ...d} as Event); else addEvent({...d, id: `evt-${Date.now()}`} as Event); setModalOpen(false); }} />}
+      {modalOpen && <EventModal event={itemToEdit} onClose={() => setModalOpen(false)} onSave={(d) => { if(itemToEdit) updateEvent({...itemToEdit, ...d} as Event); else addEvent({...d, id: crypto.randomUUID()} as Event); setModalOpen(false); }} />}
       {typeModalOpen && <ActivityTypeModal type={itemToEdit} onClose={() => setTypeModalOpen(false)} onSave={handleSaveType} />}
       
       {isImportModalOpen && (

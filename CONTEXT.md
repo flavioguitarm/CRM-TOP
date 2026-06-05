@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-05 (Sessão 2)
+> Atualizado em: 2026-06-05 (Sessão 3)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -178,8 +178,13 @@ ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
 | `productCategories` | `product_categories` | `addProductCategory`, `updateProductCategory`, `deleteProductCategory` | 2 |
 | `products` | `products` | `addProduct`, `updateProduct`, `deleteProduct` | 2 |
 | `activityTypes` | `activity_types` | `addActivityType`, `updateActivityType`, `deleteActivityType` | 2 |
+| `events` | `events` + `event_activities` | `addEvent`, `updateEvent`, `deleteEvent`, `addEventActivity` | 3 |
+| `csActions` | `cs_actions` + `cs_action_activities` | `addCSAction`, `updateCSAction`, `deleteCSAction`, `addCSActionActivity` | 3 |
+| `csDailyServices` | `cs_daily_services` | `addCSDailyService`, `updateCSDailyService`, `deleteCSDailyService` | 3 |
 
 > **Nota sobre `users`:** o fetch está implementado (o store carrega users do Supabase), mas as funções de escrita (`addUser`, `updateUser`, `deleteUser`) ainda precisam ser criadas — a página `Admin/Users.tsx` atualmente usa `setUsers` direto. Isso ficou pendente para não criar atrito com o sistema de auth.
+
+> **Nota sobre vínculo retroativo CS:** `addClient` propaga `client_id` para `cs_daily_services` no Supabase (`.update({ client_id })` via `client_phone`) além de atualizar o estado local.
 
 ---
 
@@ -187,9 +192,6 @@ ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
 
 | Entidade | Estado no store | Tabela(s) no Supabase |
 |---|---|---|
-| `events` | `useState(() => load(...))` | `events` + `event_activities` |
-| `csActions` | `useState(() => load(...))` | `cs_actions` + `cs_action_activities` |
-| `csDailyServices` | `useState(() => load(...))` | `cs_daily_services` |
 | `sales` | `useState(() => load(...))` | `sales` |
 | `negotiations` | `useState(() => load(...))` | `product_negotiations` |
 | `tasks` | `useState(() => load(...))` | `client_tasks` |
@@ -197,31 +199,30 @@ ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
 
 ---
 
-## Próxima tarefa — Bloco 2 (Operacional)
+## Próxima tarefa — Bloco 3 (Financeiro)
 
 Migrar as seguintes entidades seguindo o mesmo padrão já estabelecido:
 
-### `events` + `event_activities`
-- Fetch: `supabase.from('events').select('*, event_activities(*)')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapEventRow(row)` → `Event` (com `activities: EventActivity[]` embutidas)
-- CRUD: atualizar `addEvent`, `updateEvent`, `deleteEvent`, `addEventActivity` para fire-and-forget
-- Atenção: `startDateTime` e `endDateTime` são TIMESTAMPTZ no DB, string ISO no TS
+### `sales`
+- Fetch: `supabase.from('sales').select('*')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapSaleRow(row)` → `Sale`
+- CRUD: atualizar `addSale`, `updateSale`, `deleteSale` para fire-and-forget
+- Atenção: `addSale` e `deleteSale` atualizam `totalValue` e `purchasesCount` em `clients` — manter essa lógica e propagar ao Supabase também
 
-### `csActions` + `cs_action_activities`
-- Fetch: `supabase.from('cs_actions').select('*, cs_action_activities(*)')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapCSActionRow(row)` → `CSAction`
-- CRUD: atualizar `addCSAction`, `updateCSAction`, `deleteCSAction`, `addCSActionActivity`
-- Mapeamento: `classId` ↔ `class_id`, `responsibleUserId` ↔ `responsible_user_id`, etc.
+### `negotiations`
+- Fetch: `supabase.from('product_negotiations').select('*')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapNegotiationRow(row)` → `ProductNegotiation`
+- CRUD: atualizar `addNegotiation`, `deleteNegotiation`, `updateNegotiationStatus` para fire-and-forget
+- Atenção: `deleteNegotiation` pode chamar `deleteSale` internamente — manter a cascata
 
-### `csDailyServices`
-- Fetch: `supabase.from('cs_daily_services').select('*')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapCSDailyServiceRow(row)` → `CSDailyService`
-- CRUD: atualizar `addCSDailyService`, `updateCSDailyService`, `deleteCSDailyService`
-- Atenção: manter a lógica de vínculo retroativo com `clients` ao salvar
+### `tasks`
+- Fetch: `supabase.from('client_tasks').select('*')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapTaskRow(row)` → `Task`
+- CRUD: atualizar `addTask`, `updateTask`, `toggleTask`, `deleteTask` para fire-and-forget
 
 ---
 
-## Bloco 3 — Financeiro (após Bloco 2)
+## Bloco 3 — Financeiro (migrado após Bloco 2 — seção histórica)
 
 - `sales` → `sales` (FK para `clients`, `products`, `users`, `classes`, `product_negotiations`)
 - `negotiations` → `product_negotiations`

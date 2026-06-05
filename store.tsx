@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity } from './types';
-import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_EVENTS, MOCK_ACTIVITY_TYPES } from './constants';
+import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
 
@@ -189,6 +189,66 @@ function mapFunnelRow(row: any): Funnel {
         type:  s.type ?? 'NORMAL',
       })),
     responsibleUserIds: (row.funnel_responsible_users ?? []).map((r: any) => r.user_id),
+  };
+}
+
+// ── Mapper: linha do Supabase → Event ────────────────────────────────────
+function mapEventRow(row: any): Event {
+  return {
+    id:            row.id,
+    name:          row.name ?? '',
+    type:          row.type ?? '',
+    startDateTime: row.start_date_time ?? '',
+    endDateTime:   row.end_date_time ?? '',
+    status:        row.status ?? 'Previsão',
+    classId:       row.class_id ?? undefined,
+    activities:    (row.event_activities ?? []).map((a: any) => ({
+      id:          a.id,
+      userName:    a.user_name ?? '',
+      description: a.description ?? '',
+      timestamp:   a.timestamp ?? '',
+    })),
+  };
+}
+
+// ── Mapper: linha do Supabase → CSAction ─────────────────────────────────
+function mapCSActionRow(row: any): CSAction {
+  return {
+    id:               row.id,
+    classId:          row.class_id ?? '',
+    type:             row.type ?? '',
+    startDate:        row.start_date ?? '',
+    endDate:          row.end_date ?? '',
+    status:           row.status ?? '',
+    totalReached:     row.total_reached ?? 0,
+    totalResponses:   row.total_responses ?? 0,
+    volumeSold:       row.volume_sold ?? 0,
+    revenueResult:    row.revenue_result ?? 0,
+    channel:          row.channel ?? '',
+    responsibleUserId: row.responsible_user_id ?? undefined,
+    createdAt:        row.created_at?.split('T')[0] ?? '',
+    activities:       (row.cs_action_activities ?? []).map((a: any) => ({
+      id:          a.id,
+      userName:    a.user_name ?? '',
+      description: a.description ?? '',
+      timestamp:   a.timestamp ?? '',
+    })),
+  };
+}
+
+// ── Mapper: linha do Supabase → CSDailyService ───────────────────────────
+function mapCSDailyServiceRow(row: any): CSDailyService {
+  return {
+    id:                row.id,
+    clientId:          row.client_id ?? '',
+    clientPhone:       row.client_phone ?? '',
+    clientNameManual:  row.client_name_manual ?? undefined,
+    date:              row.date ?? '',
+    type:              row.type ?? '',
+    summary:           row.summary ?? '',
+    status:            row.status ?? '',
+    responsibleUserId: row.responsible_user_id ?? '',
+    createdAt:         row.created_at ?? '',
   };
 }
 
@@ -409,12 +469,63 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
   }, [tenantId]);
 
-  const [events, setEvents] = useState<Event[]>(() => load('events', MOCK_EVENTS));
+  const [events, setEvents] = useState<Event[]>([]);
+  const [csActions, setCsActions] = useState<CSAction[]>([]);
+  const [csDailyServices, setCsDailyServices] = useState<CSDailyService[]>([]);
+
+  // Fetch: events (com atividades)
+  useEffect(() => {
+    if (!tenantId) { setEvents([]); return; }
+    supabase
+      .from('events')
+      .select(`
+        id, name, type, start_date_time, end_date_time, status, class_id,
+        event_activities(id, user_name, description, timestamp)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('start_date_time', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('events fetch:', error.message); return; }
+        setEvents((data ?? []).map(mapEventRow));
+      });
+  }, [tenantId]);
+
+  // Fetch: csActions (com atividades)
+  useEffect(() => {
+    if (!tenantId) { setCsActions([]); return; }
+    supabase
+      .from('cs_actions')
+      .select(`
+        id, class_id, type, start_date, end_date, status,
+        total_reached, total_responses, volume_sold, revenue_result,
+        channel, responsible_user_id, created_at,
+        cs_action_activities(id, user_name, description, timestamp)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('csActions fetch:', error.message); return; }
+        setCsActions((data ?? []).map(mapCSActionRow));
+      });
+  }, [tenantId]);
+
+  // Fetch: csDailyServices
+  useEffect(() => {
+    if (!tenantId) { setCsDailyServices([]); return; }
+    supabase
+      .from('cs_daily_services')
+      .select('id, client_id, client_phone, client_name_manual, date, type, summary, status, responsible_user_id, created_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('csDailyServices fetch:', error.message); return; }
+        setCsDailyServices((data ?? []).map(mapCSDailyServiceRow));
+      });
+  }, [tenantId]);
+
   const [tasks, setTasks] = useState<Task[]>(() => load('tasks', []));
   const [sales, setSales] = useState<Sale[]>(() => load('sales', MOCK_SALES));
   const [negotiations, setNegotiations] = useState<ProductNegotiation[]>(() => load('negotiations', []));
-  const [csActions, setCsActions] = useState<CSAction[]>(() => load('csActions', []));
-  const [csDailyServices, setCsDailyServices] = useState<CSDailyService[]>(() => load('csDailyServices', []));
   const [trash, setTrash] = useState<TrashItem[]>(() => load('trash', []));
   const [googleSheetUrl, setGoogleSheetUrl] = useState<string>(() => load('googleSheetUrl', ''));
 
@@ -425,15 +536,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
 
-    // users, productCategories, products, activityTypes, institutions, courses, classes, clients e funnels são persistidos no Supabase
+    // users, productCategories, products, activityTypes, institutions, courses, classes, clients, funnels,
+    // events, csActions e csDailyServices são persistidos no Supabase
     const dataMap = {
-      events, tasks, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
+      tasks, sales, negotiations, trash, googleSheetUrl
     };
 
     Object.entries(dataMap).forEach(([key, value]) => {
       localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
     });
-  }, [events, tasks, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
+  }, [tasks, sales, negotiations, trash, googleSheetUrl]);
 
   const syncWithGoogleSheet = async () => {
     if (!googleSheetUrl) return;
@@ -556,13 +668,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (tenantId) ids.forEach(id => supabase.from('users').delete().eq('id', id).eq('tenant_id', tenantId).then());
           handleRemoval(users, setUsers, 'name');
           break;
-        case 'event': handleRemoval(events, setEvents, 'name'); break;
+        case 'event':
+          if (tenantId) ids.forEach(id => supabase.from('events').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(events, setEvents, 'name');
+          break;
         case 'activityType':
           if (tenantId) ids.forEach(id => supabase.from('activity_types').delete().eq('id', id).eq('tenant_id', tenantId).then());
           handleRemoval(activityTypes, setActivityTypes, 'name');
           break;
-        case 'csAction': handleRemoval(csActions, setCsActions, 'type'); break;
-        case 'csDailyService': handleRemoval(csDailyServices, setCsDailyServices, 'summary'); break;
+        case 'csAction':
+          if (tenantId) ids.forEach(id => supabase.from('cs_actions').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(csActions, setCsActions, 'type');
+          break;
+        case 'csDailyService':
+          if (tenantId) ids.forEach(id => supabase.from('cs_daily_services').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(csDailyServices, setCsDailyServices, 'summary');
+          break;
     }
 
     if (newTrashItems.length > 0) {
@@ -653,7 +774,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           setUsers(p => [...p, restoredData]);
           break;
-        case 'event': setEvents(p => [...p, restoredData]); break;
+        case 'event':
+          if (tenantId) {
+            supabase.from('events').insert({
+              id:              restoredData.id,
+              tenant_id:       tenantId,
+              name:            restoredData.name,
+              type:            restoredData.type,
+              start_date_time: restoredData.startDateTime || new Date().toISOString(),
+              end_date_time:   restoredData.endDateTime   || restoredData.startDateTime || new Date().toISOString(),
+              status:          restoredData.status,
+              class_id:        restoredData.classId        || null,
+            }).then(({ error }) => { if (error) console.error('restore event:', error.message); });
+          }
+          setEvents(p => [...p, restoredData]);
+          break;
         case 'activityType':
           if (tenantId) {
             supabase.from('activity_types').insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name, color: restoredData.color ?? null })
@@ -661,8 +796,43 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           setActivityTypes(p => [...p, restoredData]);
           break;
-        case 'csAction': setCsActions(p => [...p, restoredData]); break;
-        case 'csDailyService': setCsDailyServices(p => [...p, restoredData]); break;
+        case 'csAction':
+          if (tenantId) {
+            supabase.from('cs_actions').insert({
+              id:                  restoredData.id,
+              tenant_id:           tenantId,
+              class_id:            restoredData.classId,
+              type:                restoredData.type,
+              start_date:          restoredData.startDate          || null,
+              end_date:            restoredData.endDate            || null,
+              status:              restoredData.status,
+              total_reached:       restoredData.totalReached       ?? 0,
+              total_responses:     restoredData.totalResponses     ?? 0,
+              volume_sold:         restoredData.volumeSold         ?? 0,
+              revenue_result:      restoredData.revenueResult      ?? 0,
+              channel:             restoredData.channel            || null,
+              responsible_user_id: restoredData.responsibleUserId  || null,
+            }).then(({ error }) => { if (error) console.error('restore csAction:', error.message); });
+          }
+          setCsActions(p => [...p, restoredData]);
+          break;
+        case 'csDailyService':
+          if (tenantId) {
+            supabase.from('cs_daily_services').insert({
+              id:                  restoredData.id,
+              tenant_id:           tenantId,
+              client_id:           restoredData.clientId          || null,
+              client_phone:        restoredData.clientPhone,
+              client_name_manual:  restoredData.clientNameManual  || null,
+              date:                restoredData.date,
+              type:                restoredData.type,
+              summary:             restoredData.summary,
+              status:              restoredData.status,
+              responsible_user_id: restoredData.responsibleUserId || null,
+            }).then(({ error }) => { if (error) console.error('restore csDailyService:', error.message); });
+          }
+          setCsDailyServices(p => [...p, restoredData]);
+          break;
     }
 
     setTrash(p => p.filter(t => t.id !== trashId));
@@ -748,6 +918,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (orphans.length > 0) {
         newClient.activities = [...orphanActivities, ...newClient.activities];
         setCsDailyServices(prev => prev.map(s => s.clientPhone === client.phone ? { ...s, clientId: newClient.id } : s));
+        if (tenantId) {
+          supabase.from('cs_daily_services')
+            .update({ client_id: newClient.id })
+            .eq('client_phone', client.phone)
+            .eq('tenant_id', tenantId)
+            .then(({ error }) => { if (error) console.error('retroactive csDs link:', error.message); });
+        }
     }
 
     setClients(prev => [newClient, ...prev]);
@@ -1078,11 +1255,51 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteClass = (id: string) => moveToTrash('class', [id]);
 
-  const addEvent = (event: Event) => setEvents(prev => [event, ...prev]);
-  const updateEvent = (event: Event) => setEvents(prev => prev.map(e => e.id === event.id ? event : e));
+  const addEvent = (event: Event) => {
+    setEvents(prev => [event, ...prev]);
+    if (tenantId) {
+      supabase.from('events').insert({
+        id:              event.id,
+        tenant_id:       tenantId,
+        name:            event.name,
+        type:            event.type,
+        start_date_time: event.startDateTime || new Date().toISOString(),
+        end_date_time:   event.endDateTime   || event.startDateTime || new Date().toISOString(),
+        status:          event.status,
+        class_id:        event.classId        || null,
+      }).then(({ error }) => { if (error) console.error('addEvent:', error.message); });
+    }
+  };
+
+  const updateEvent = (event: Event) => {
+    setEvents(prev => prev.map(e => e.id === event.id ? event : e));
+    if (tenantId) {
+      supabase.from('events').update({
+        name:            event.name,
+        type:            event.type,
+        start_date_time: event.startDateTime || new Date().toISOString(),
+        end_date_time:   event.endDateTime   || event.startDateTime || new Date().toISOString(),
+        status:          event.status,
+        class_id:        event.classId        || null,
+      }).eq('id', event.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateEvent:', error.message); });
+    }
+  };
+
   const deleteEvent = (id: string) => moveToTrash('event', [id]);
+
   const addEventActivity = (eventId: string, activity: EventActivity) => {
     setEvents(prev => prev.map(e => e.id === eventId ? { ...e, activities: [activity, ...(e.activities || [])] } : e));
+    if (tenantId) {
+      supabase.from('event_activities').insert({
+        id:          activity.id,
+        tenant_id:   tenantId,
+        event_id:    eventId,
+        user_name:   activity.userName,
+        description: activity.description ?? '',
+        timestamp:   activity.timestamp || new Date().toISOString(),
+      }).then(({ error }) => { if (error) console.error('addEventActivity:', error.message); });
+    }
   };
 
   // Helper: insere stages + responsáveis no Supabase para um funil
@@ -1260,27 +1477,106 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } : c));
   };
 
-  const addCSAction = (action: CSAction) => setCsActions(prev => [action, ...prev]);
-  const updateCSAction = (action: CSAction) => setCsActions(prev => prev.map(a => a.id === action.id ? action : a));
+  const addCSAction = (action: CSAction) => {
+    setCsActions(prev => [action, ...prev]);
+    if (tenantId) {
+      supabase.from('cs_actions').insert({
+        id:                  action.id,
+        tenant_id:           tenantId,
+        class_id:            action.classId,
+        type:                action.type,
+        start_date:          action.startDate        || null,
+        end_date:            action.endDate          || null,
+        status:              action.status,
+        total_reached:       action.totalReached     ?? 0,
+        total_responses:     action.totalResponses   ?? 0,
+        volume_sold:         action.volumeSold       ?? 0,
+        revenue_result:      action.revenueResult    ?? 0,
+        channel:             action.channel          || null,
+        responsible_user_id: action.responsibleUserId || null,
+      }).then(({ error }) => { if (error) console.error('addCSAction:', error.message); });
+    }
+  };
+
+  const updateCSAction = (action: CSAction) => {
+    setCsActions(prev => prev.map(a => a.id === action.id ? action : a));
+    if (tenantId) {
+      supabase.from('cs_actions').update({
+        class_id:            action.classId,
+        type:                action.type,
+        start_date:          action.startDate        || null,
+        end_date:            action.endDate          || null,
+        status:              action.status,
+        total_reached:       action.totalReached     ?? 0,
+        total_responses:     action.totalResponses   ?? 0,
+        volume_sold:         action.volumeSold       ?? 0,
+        revenue_result:      action.revenueResult    ?? 0,
+        channel:             action.channel          || null,
+        responsible_user_id: action.responsibleUserId || null,
+      }).eq('id', action.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateCSAction:', error.message); });
+    }
+  };
+
   const addCSActionActivity = (actionId: string, activity: CSActionActivity) => {
     setCsActions(prev => prev.map(a => a.id === actionId ? { ...a, activities: [activity, ...a.activities] } : a));
+    if (tenantId) {
+      supabase.from('cs_action_activities').insert({
+        id:          activity.id,
+        tenant_id:   tenantId,
+        cs_action_id: actionId,
+        user_name:   activity.userName,
+        description: activity.description ?? '',
+        timestamp:   activity.timestamp || new Date().toISOString(),
+      }).then(({ error }) => { if (error) console.error('addCSActionActivity:', error.message); });
+    }
   };
+
   const deleteCSAction = (id: string) => moveToTrash('csAction', [id]);
 
   const addCSDailyService = (service: CSDailyService) => {
-      setCsDailyServices(prev => [service, ...prev]);
-      // Se houver cliente vinculado, adiciona ao histórico dele
-      if (service.clientId) {
-          addClientActivity(service.clientId, {
-            id: `act-cs-${Date.now()}`,
-            type: service.type === 'Ligação' ? 'call' : service.type === 'E-mail' ? 'email' : 'note',
-            description: `ATENDIMENTO CS: ${service.summary}`,
-            timestamp: new Date().toLocaleString('pt-BR'),
-          });
-      }
+    setCsDailyServices(prev => [service, ...prev]);
+    if (tenantId) {
+      supabase.from('cs_daily_services').insert({
+        id:                  service.id,
+        tenant_id:           tenantId,
+        client_id:           service.clientId          || null,
+        client_phone:        service.clientPhone,
+        client_name_manual:  service.clientNameManual  || null,
+        date:                service.date,
+        type:                service.type,
+        summary:             service.summary,
+        status:              service.status,
+        responsible_user_id: service.responsibleUserId || null,
+      }).then(({ error }) => { if (error) console.error('addCSDailyService:', error.message); });
+    }
+    if (service.clientId) {
+      addClientActivity(service.clientId, {
+        id:          `act-cs-${Date.now()}`,
+        type:        service.type === 'Ligação' ? 'call' : service.type === 'E-mail' ? 'email' : 'note',
+        description: `ATENDIMENTO CS: ${service.summary}`,
+        timestamp:   new Date().toLocaleString('pt-BR'),
+      });
+    }
   };
 
-  const updateCSDailyService = (service: CSDailyService) => setCsDailyServices(prev => prev.map(s => s.id === service.id ? service : s));
+  const updateCSDailyService = (service: CSDailyService) => {
+    setCsDailyServices(prev => prev.map(s => s.id === service.id ? service : s));
+    if (tenantId) {
+      supabase.from('cs_daily_services').update({
+        client_id:           service.clientId          || null,
+        client_phone:        service.clientPhone,
+        client_name_manual:  service.clientNameManual  || null,
+        date:                service.date,
+        type:                service.type,
+        summary:             service.summary,
+        status:              service.status,
+        responsible_user_id: service.responsibleUserId || null,
+      }).eq('id', service.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateCSDailyService:', error.message); });
+    }
+  };
+
   const deleteCSDailyService = (id: string) => moveToTrash('csDailyService', [id]);
 
   const resetDatabase = () => {
