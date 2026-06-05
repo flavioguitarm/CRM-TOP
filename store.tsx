@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_EVENTS, MOCK_ACTIVITY_TYPES } from './constants';
+import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
 
 interface DataContextType {
@@ -51,8 +52,15 @@ interface DataContextType {
   addClientActivity: (clientId: string, activity: any) => void;
   addClient: (client: Client) => void;
   updateClient: (client: Client) => void;
-  addClass: (newClass: ClassRoom) => void;
-  updateClass: (updatedClass: ClassRoom) => void;
+  // ── Supabase-backed CRUD ────────────────────────────────
+  addInstitution: (data: Omit<Institution, 'id' | 'createdAt'>) => Promise<void>;
+  updateInstitution: (institution: Institution) => Promise<void>;
+  deleteInstitution: (id: string) => Promise<void>;
+  addCourse: (data: Omit<Course, 'id' | 'createdAt'>) => Promise<void>;
+  updateCourse: (course: Course) => Promise<void>;
+  deleteCourse: (id: string) => Promise<void>;
+  addClass: (newClass: ClassRoom) => Promise<void>;
+  updateClass: (updatedClass: ClassRoom) => Promise<void>;
   deleteClass: (classId: string) => void;
   addEvent: (event: Event) => void;
   updateEvent: (event: Event) => void;
@@ -88,7 +96,39 @@ interface DataContextType {
   importDatabase: (jsonData: string) => void;
 }
 
-const STORAGE_KEY = 'crm_top_formaturas_v1_prod_v3'; 
+const STORAGE_KEY = 'crm_top_formaturas_v1_prod_v3';
+
+// ── Mapper: linha do Supabase → ClassRoom ──────────────────────────────────
+function mapClassRow(row: any): ClassRoom {
+  return {
+    id: row.id,
+    name: row.name,
+    institutionId: row.institution_id,
+    courseIds: (row.class_courses ?? []).map((cc: any) => cc.course_id),
+    graduationYear: row.graduation_year,
+    graduationMonth: row.graduation_month,
+    comercialExterno: row.comercial_externo ?? '',
+    gestorProjeto: row.gestor_projeto ?? '',
+    consultorCSId: row.consultor_cs_id ?? '',
+    createdAt: row.created_at?.split('T')[0] ?? '',
+    classProducts: (row.class_products ?? []).map((cp: any) => ({
+      id: cp.id,
+      productId: cp.product_id,
+      customPrice: cp.custom_price,
+      goalQuantity: cp.goal_quantity,
+      goalValue: cp.goal_value,
+      erpQuantity: cp.erp_quantity ?? undefined,
+      erpValue: cp.erp_value ?? undefined,
+    })),
+    timeline: (row.class_timeline_events ?? []).map((te: any) => ({
+      id: te.id,
+      title: te.title,
+      date: te.date,
+      description: te.description ?? '',
+      completed: te.completed ?? false,
+    })),
+  };
+}
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
@@ -108,12 +148,84 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
+  const [tenantId, setTenantId] = useState<string | null>(null);
+
+  // Rastreia o tenant_id a partir da sessão Supabase Auth
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setTenantId(data.session?.user.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setTenantId(session?.user.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [users, setUsers] = useState<User[]>(() => load('users', MOCK_USERS));
   const [clients, setClients] = useState<Client[]>(() => load('clients', MOCK_CLIENTS));
-  const [classes, setClasses] = useState<ClassRoom[]>(() => load('classes', MOCK_CLASSES));
-  const [institutions, setInstitutions] = useState<Institution[]>(() => load('institutions', MOCK_INSTITUTIONS));
-  const [courses, setCourses] = useState<Course[]>(() => load('courses', MOCK_COURSES));
+
+  // ── Entidades migradas para Supabase (sem localStorage) ──────────────────
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [classes, setClasses] = useState<ClassRoom[]>([]);
+
+  // Fetch: institutions
+  useEffect(() => {
+    if (!tenantId) { setInstitutions([]); return; }
+    supabase
+      .from('institutions')
+      .select('id, name, state, campi, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('institutions fetch:', error.message); return; }
+        setInstitutions((data ?? []).map(r => ({
+          id: r.id,
+          name: r.name,
+          state: r.state ?? '',
+          campi: r.campi ?? [],
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: courses
+  useEffect(() => {
+    if (!tenantId) { setCourses([]); return; }
+    supabase
+      .from('courses')
+      .select('id, name, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('courses fetch:', error.message); return; }
+        setCourses((data ?? []).map(r => ({
+          id: r.id,
+          name: r.name,
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: classes (com sub-tabelas)
+  useEffect(() => {
+    if (!tenantId) { setClasses([]); return; }
+    supabase
+      .from('classes')
+      .select(`
+        id, name, institution_id, graduation_year, graduation_month,
+        comercial_externo, gestor_projeto, consultor_cs_id, created_at,
+        class_courses(course_id),
+        class_products(id, product_id, custom_price, goal_quantity, goal_value, erp_quantity, erp_value),
+        class_timeline_events(id, title, date, description, completed)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('graduation_year')
+      .then(({ data, error }) => {
+        if (error) { console.error('classes fetch:', error.message); return; }
+        setClasses((data ?? []).map(mapClassRow));
+      });
+  }, [tenantId]);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>(() => load('productCategories', [
     { id: 'cat-1', name: 'Adesão', createdAt: today },
     { id: 'cat-2', name: 'Convite Extra', createdAt: today },
@@ -138,15 +250,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
 
+    // institutions, courses e classes são agora persistidas no Supabase — não gravar em localStorage
     const dataMap = {
-      users, clients, classes, institutions, courses, productCategories,
+      users, clients, productCategories,
       products, funnels, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
     };
 
     Object.entries(dataMap).forEach(([key, value]) => {
       localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
     });
-  }, [users, clients, classes, institutions, courses, productCategories, products, funnels, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
+  }, [users, clients, productCategories, products, funnels, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
 
   const syncWithGoogleSheet = async () => {
     if (!googleSheetUrl) return;
@@ -236,11 +349,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     switch (entityType) {
-        case 'course': handleRemoval(courses, setCourses, 'name'); break;
-        case 'institution': handleRemoval(institutions, setInstitutions, 'name'); break;
+        case 'institution':
+          // Supabase delete — sem await para não bloquear a UI
+          if (tenantId) ids.forEach(id => supabase.from('institutions').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(institutions, setInstitutions, 'name');
+          break;
+        case 'course':
+          if (tenantId) ids.forEach(id => supabase.from('courses').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(courses, setCourses, 'name');
+          break;
+        case 'class':
+          if (tenantId) ids.forEach(id => supabase.from('classes').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(classes, setClasses, 'name');
+          break;
         case 'product': handleRemoval(products, setProducts, 'name'); break;
         case 'productCategory': handleRemoval(productCategories, setProductCategories, 'name'); break;
-        case 'class': handleRemoval(classes, setClasses, 'name'); break;
         case 'user': handleRemoval(users, setUsers, 'name'); break;
         case 'funnel': handleRemoval(funnels, setFunnels, 'name'); break;
         case 'event': handleRemoval(events, setEvents, 'name'); break;
@@ -261,11 +384,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const restoredData = item.data;
     switch (item.entityType) {
-        case 'course': setCourses(p => [...p, restoredData]); break;
-        case 'institution': setInstitutions(p => [...p, restoredData]); break;
+        case 'institution':
+          if (tenantId) {
+            supabase.from('institutions').insert({
+              id: restoredData.id, tenant_id: tenantId, name: restoredData.name,
+              state: restoredData.state, campi: restoredData.campi ?? [],
+            }).then(({ error }) => { if (error) console.error('restore institution:', error.message); });
+          }
+          setInstitutions(p => [...p, restoredData]);
+          break;
+        case 'course':
+          if (tenantId) {
+            supabase.from('courses').insert({
+              id: restoredData.id, tenant_id: tenantId, name: restoredData.name,
+            }).then(({ error }) => { if (error) console.error('restore course:', error.message); });
+          }
+          setCourses(p => [...p, restoredData]);
+          break;
+        case 'class':
+          if (tenantId) {
+            supabase.from('classes').insert({
+              id: restoredData.id, tenant_id: tenantId, name: restoredData.name,
+              institution_id: restoredData.institutionId,
+              graduation_year: restoredData.graduationYear,
+              graduation_month: restoredData.graduationMonth,
+              comercial_externo: restoredData.comercialExterno || null,
+              gestor_projeto: restoredData.gestorProjeto || null,
+              consultor_cs_id: restoredData.consultorCSId || null,
+            }).then(async ({ error }) => {
+              if (error) { console.error('restore class:', error.message); return; }
+              if (restoredData.courseIds?.length) {
+                await supabase.from('class_courses').insert(
+                  restoredData.courseIds.map((cid: string) => ({ class_id: restoredData.id, course_id: cid }))
+                );
+              }
+            });
+          }
+          setClasses(p => [...p, restoredData]);
+          break;
         case 'product': setProducts(p => [...p, restoredData]); break;
         case 'productCategory': setProductCategories(p => [...p, restoredData]); break;
-        case 'class': setClasses(p => [...p, restoredData]); break;
         case 'user': setUsers(p => [...p, restoredData]); break;
         case 'funnel': setFunnels(p => [...p, restoredData]); break;
         case 'event': setEvents(p => [...p, restoredData]); break;
@@ -326,8 +484,162 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateClient = (client: Client) => setClients(prev => prev.map(c => c.id === client.id ? client : c));
   
-  const addClass = (newClass: ClassRoom) => setClasses(prev => [...prev, { ...newClass, createdAt: today, classProducts: newClass.classProducts || [] }]);
-  const updateClass = (updatedClass: ClassRoom) => setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
+  // ── institutions ────────────────────────────────────────────────────────────
+
+  const addInstitution = async (data: Omit<Institution, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('institutions')
+      .insert({ tenant_id: tenantId, name: data.name, state: data.state, campi: data.campi ?? [] })
+      .select('id, name, state, campi, created_at')
+      .single();
+    if (error) { console.error('addInstitution:', error.message); return; }
+    setInstitutions(prev => [...prev, {
+      id: row.id, name: row.name, state: row.state ?? '',
+      campi: row.campi ?? [], createdAt: row.created_at?.split('T')[0] ?? today,
+    }]);
+  };
+
+  const updateInstitution = async (institution: Institution) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('institutions')
+      .update({ name: institution.name, state: institution.state, campi: institution.campi ?? [] })
+      .eq('id', institution.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateInstitution:', error.message); return; }
+    setInstitutions(prev => prev.map(i => i.id === institution.id ? institution : i));
+  };
+
+  const deleteInstitution = async (id: string) => {
+    if (!tenantId) return;
+    const item = institutions.find(i => i.id === id);
+    if (!item) return;
+    const { error } = await supabase
+      .from('institutions')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('deleteInstitution:', error.message); return; }
+    setInstitutions(prev => prev.filter(i => i.id !== id));
+    setTrash(prev => [{
+      id: `trash-${Date.now()}-${Math.random()}`,
+      entityType: 'institution',
+      data: item,
+      deletedAt: new Date().toISOString(),
+      originalName: item.name,
+    }, ...prev]);
+  };
+
+  // ── courses ─────────────────────────────────────────────────────────────────
+
+  const addCourse = async (data: Omit<Course, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('courses')
+      .insert({ tenant_id: tenantId, name: data.name })
+      .select('id, name, created_at')
+      .single();
+    if (error) { console.error('addCourse:', error.message); return; }
+    setCourses(prev => [...prev, { id: row.id, name: row.name, createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateCourse = async (course: Course) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('courses')
+      .update({ name: course.name })
+      .eq('id', course.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateCourse:', error.message); return; }
+    setCourses(prev => prev.map(c => c.id === course.id ? course : c));
+  };
+
+  const deleteCourse = async (id: string) => {
+    if (!tenantId) return;
+    const item = courses.find(c => c.id === id);
+    if (!item) return;
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('deleteCourse:', error.message); return; }
+    setCourses(prev => prev.filter(c => c.id !== id));
+    setTrash(prev => [{
+      id: `trash-${Date.now()}-${Math.random()}`,
+      entityType: 'course',
+      data: item,
+      deletedAt: new Date().toISOString(),
+      originalName: item.name,
+    }, ...prev]);
+  };
+
+  // ── classes ─────────────────────────────────────────────────────────────────
+
+  const addClass = async (newClass: ClassRoom) => {
+    if (!tenantId) return;
+    const classId = newClass.id || `t-${Date.now()}`;
+    const { data: row, error } = await supabase
+      .from('classes')
+      .insert({
+        id: classId,
+        tenant_id: tenantId,
+        name: newClass.name,
+        institution_id: newClass.institutionId,
+        graduation_year: newClass.graduationYear,
+        graduation_month: newClass.graduationMonth,
+        comercial_externo: newClass.comercialExterno || null,
+        gestor_projeto: newClass.gestorProjeto || null,
+        consultor_cs_id: newClass.consultorCSId || null,
+      })
+      .select('id, created_at')
+      .single();
+    if (error) { console.error('addClass:', error.message); return; }
+
+    if (newClass.courseIds?.length) {
+      await supabase.from('class_courses').insert(
+        newClass.courseIds.map(courseId => ({ class_id: row.id, course_id: courseId }))
+      );
+    }
+
+    setClasses(prev => [...prev, {
+      ...newClass,
+      id: row.id,
+      createdAt: row.created_at?.split('T')[0] ?? today,
+      classProducts: newClass.classProducts || [],
+      timeline: newClass.timeline || [],
+    }]);
+  };
+
+  const updateClass = async (updatedClass: ClassRoom) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('classes')
+      .update({
+        name: updatedClass.name,
+        institution_id: updatedClass.institutionId,
+        graduation_year: updatedClass.graduationYear,
+        graduation_month: updatedClass.graduationMonth,
+        comercial_externo: updatedClass.comercialExterno || null,
+        gestor_projeto: updatedClass.gestorProjeto || null,
+        consultor_cs_id: updatedClass.consultorCSId || null,
+      })
+      .eq('id', updatedClass.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateClass:', error.message); return; }
+
+    // Recoloca os course links: delete + insert
+    await supabase.from('class_courses').delete().eq('class_id', updatedClass.id);
+    if (updatedClass.courseIds?.length) {
+      await supabase.from('class_courses').insert(
+        updatedClass.courseIds.map(courseId => ({ class_id: updatedClass.id, course_id: courseId }))
+      );
+    }
+
+    setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
+  };
+
   const deleteClass = (id: string) => moveToTrash('class', [id]);
 
   const addEvent = (event: Event) => setEvents(prev => [event, ...prev]);
@@ -406,28 +718,61 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status, closedAt: closedAt || n.closedAt } : n));
   };
 
-  const addClassProduct = (classId: string, cp: ClassProduct) => {
+  const addClassProduct = async (classId: string, cp: ClassProduct) => {
     const cpWithId = { ...cp, id: cp.id || `cp-${Date.now()}-${Math.random()}` };
+    if (tenantId) {
+      const { error } = await supabase.from('class_products').insert({
+        id: cpWithId.id,
+        tenant_id: tenantId,
+        class_id: classId,
+        product_id: cp.productId,
+        custom_price: cp.customPrice,
+        goal_quantity: cp.goalQuantity,
+        goal_value: cp.goalValue,
+        erp_quantity: cp.erpQuantity ?? null,
+        erp_value: cp.erpValue ?? null,
+      });
+      if (error) console.error('addClassProduct:', error.message);
+    }
     setClasses(prev => prev.map(c => c.id === classId ? { ...c, classProducts: [...(c.classProducts || []), cpWithId] } : c));
   };
 
-  const updateClassProduct = (classId: string, cp: ClassProduct) => {
-    setClasses(prev => prev.map(c => c.id === classId ? { 
-      ...c, 
+  const updateClassProduct = async (classId: string, cp: ClassProduct) => {
+    if (tenantId && cp.id) {
+      const { error } = await supabase.from('class_products').update({
+        custom_price: cp.customPrice,
+        goal_quantity: cp.goalQuantity,
+        goal_value: cp.goalValue,
+        erp_quantity: cp.erpQuantity ?? null,
+        erp_value: cp.erpValue ?? null,
+      }).eq('id', cp.id).eq('tenant_id', tenantId);
+      if (error) console.error('updateClassProduct:', error.message);
+    }
+    setClasses(prev => prev.map(c => c.id === classId ? {
+      ...c,
       classProducts: (c.classProducts || []).map(p => {
         if (cp.id && p.id) return p.id === cp.id ? cp : p;
         return p.productId === cp.productId ? cp : p;
-      }) 
+      })
     } : c));
   };
 
-  const removeClassProduct = (classId: string, identifier: string) => {
-    setClasses(prev => prev.map(c => c.id === classId ? { 
-      ...c, 
+  const removeClassProduct = async (classId: string, identifier: string) => {
+    if (tenantId) {
+      // identifier pode ser o id do class_product ou o productId
+      const { error } = await supabase.from('class_products')
+        .delete()
+        .or(`id.eq.${identifier},product_id.eq.${identifier}`)
+        .eq('class_id', classId)
+        .eq('tenant_id', tenantId);
+      if (error) console.error('removeClassProduct:', error.message);
+    }
+    setClasses(prev => prev.map(c => c.id === classId ? {
+      ...c,
       classProducts: (c.classProducts || []).filter(p => {
         if (p.id) return p.id !== identifier;
         return p.productId !== identifier;
-      }) 
+      })
     } : c));
   };
 
@@ -472,6 +817,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       googleSheetUrl, setGoogleSheetUrl, syncWithGoogleSheet,
       moveToTrash, restoreFromTrash,
       updateClientStage, addClientActivity, addClient, updateClient,
+      addInstitution, updateInstitution, deleteInstitution,
+      addCourse, updateCourse, deleteCourse,
       addClass, updateClass, deleteClass, addEvent, updateEvent, addEventActivity, deleteEvent,
       addTask, updateTask, toggleTask, deleteTask,
       canDeleteEntity, updateFunnel, addFunnel, deleteFunnel, isStageOccupied,

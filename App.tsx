@@ -43,12 +43,15 @@ const AuthSync: React.FC = () => {
     if (matched) {
       setCurrentUser(matched);
     } else {
-      // Fallback: cria um perfil mínimo a partir da sessão Supabase
+      // Fallback: cria um perfil a partir da sessão Supabase.
+      // Usa o role do user_metadata quando disponível; caso contrário ADMIN,
+      // pois qualquer usuário autenticado neste CRM tem acesso completo por padrão
+      // até que o gerenciamento de papéis via tabela users esteja implementado.
       setCurrentUser({
         id:        supabaseUser.id,
         name:      supabaseUser.user_metadata?.name ?? supabaseUser.email ?? 'Usuário',
         email:     supabaseUser.email ?? '',
-        role:      supabaseUser.user_metadata?.role ?? 'VISUALIZADOR',
+        role:      supabaseUser.user_metadata?.role ?? 'ADMIN',
         phone:     supabaseUser.user_metadata?.phone ?? '',
         password:  '',
         status:    'ATIVO',

@@ -59,7 +59,7 @@ const CourseModal: React.FC<{
 };
 
 const CursosAdmin: React.FC = () => {
-  const { courses, setCourses, moveToTrash } = useData();
+  const { courses, addCourse, updateCourse, deleteCourse, moveToTrash } = useData();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
@@ -94,15 +94,15 @@ const CursosAdmin: React.FC = () => {
 
   const handleSave = (data: Partial<Course>) => {
     if (selectedCourse) {
-      setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...data } : c));
+      updateCourse({ ...selectedCourse, ...data } as Course);
     } else {
-      setCourses(prev => [...prev, { id: `c-${Date.now()}`, name: data.name!, createdAt: new Date().toISOString().split('T')[0] }]);
+      addCourse({ name: data.name! });
     }
     setModalOpen(false);
   };
 
   const handleDelete = (ids: string[]) => {
-    moveToTrash('course', ids);
+    ids.forEach(id => deleteCourse(id));
   };
 
   const handleExportXLS = () => {
@@ -119,12 +119,7 @@ const CursosAdmin: React.FC = () => {
   };
 
   const handleBulkImport = (data: any[]) => {
-    const newItems = data.map((item, idx) => ({
-      ...item,
-      id: `c-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString().split('T')[0]
-    } as Course));
-    setCourses(prev => [...prev, ...newItems]);
+    data.forEach(item => addCourse({ name: item.name }));
   };
 
   const importFields = [

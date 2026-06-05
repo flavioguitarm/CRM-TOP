@@ -110,7 +110,7 @@ const InstitutionModal: React.FC<{
 };
 
 const InstituicoesAdmin: React.FC = () => {
-  const { institutions, setInstitutions, classes } = useData();
+  const { institutions, addInstitution, updateInstitution, deleteInstitution, classes } = useData();
   const [selectedInstId, setSelectedInstId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -161,14 +161,8 @@ const InstituicoesAdmin: React.FC = () => {
   };
 
   const handleBulkImport = (data: any[]) => {
-    const today = new Date().toISOString().split('T')[0];
     data.forEach(item => {
-      setInstitutions(prev => [...prev, {
-        ...item,
-        id: `inst-${Date.now()}-${Math.random()}`,
-        campi: [],
-        createdAt: today
-      } as Institution]);
+      addInstitution({ name: item.name, state: item.state ?? '', campi: [] });
     });
   };
 
@@ -200,7 +194,7 @@ const InstituicoesAdmin: React.FC = () => {
               </div>
               <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); handleEdit(inst); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Edit3 size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) setInstitutions(p => p.filter(i => i.id !== inst.id)); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) deleteInstitution(inst.id); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
@@ -259,10 +253,10 @@ const InstituicoesAdmin: React.FC = () => {
         </div>
       )}
 
-      {modalOpen && <InstitutionModal institution={instToEdit} onClose={() => setModalOpen(false)} onSave={(d) => { 
-          if(instToEdit) setInstitutions(p => p.map(i => i.id === instToEdit.id ? {...i, ...d} as Institution : i)); 
-          else setInstitutions(p => [...p, {...d, id: `inst-${Date.now()}`, createdAt: new Date().toISOString().split('T')[0]} as Institution]); 
-          setModalOpen(false); 
+      {modalOpen && <InstitutionModal institution={instToEdit} onClose={() => setModalOpen(false)} onSave={(d) => {
+          if (instToEdit) updateInstitution({ ...instToEdit, ...d } as Institution);
+          else addInstitution({ name: d.name!, state: d.state ?? '', campi: d.campi ?? [] });
+          setModalOpen(false);
       }} />}
       
       {isImportModalOpen && (
