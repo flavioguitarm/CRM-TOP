@@ -162,7 +162,7 @@ const UserModal: React.FC<{
 };
 
 const UsersAdmin: React.FC = () => {
-  const { users, setUsers, currentUser } = useData();
+  const { users, setUsers, addUser, updateUser, deleteUser, currentUser } = useData();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -238,19 +238,14 @@ const UsersAdmin: React.FC = () => {
       alert("Permissão negada. Apenas administradores podem excluir usuários.");
       return;
     }
-    setUsers(prev => prev.filter(u => !ids.includes(u.id)));
+    ids.forEach(id => deleteUser(id));
   };
 
   const handleSave = (userData: Partial<User>) => {
     if (selectedUser) {
-      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...userData } : u));
+      updateUser({ ...selectedUser, ...userData } as User);
     } else {
-      const newUser: User = {
-        ...userData as User,
-        id: `u-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      };
-      setUsers(prev => [...prev, newUser]);
+      addUser(userData as Omit<User, 'id' | 'createdAt'>);
     }
     setModalOpen(false);
   };

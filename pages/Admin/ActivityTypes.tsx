@@ -59,7 +59,7 @@ const ActivityTypeModal: React.FC<{
 };
 
 const ActivityTypesAdmin: React.FC = () => {
-  const { activityTypes, setActivityTypes, moveToTrash } = useData();
+  const { activityTypes, setActivityTypes, addActivityType, updateActivityType, moveToTrash } = useData();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<ActivityType | null>(null);
 
@@ -94,13 +94,9 @@ const ActivityTypesAdmin: React.FC = () => {
 
   const handleSave = (data: Partial<ActivityType>) => {
     if (selectedType) {
-      setActivityTypes(prev => prev.map(t => t.id === selectedType.id ? { ...t, ...data } : t));
+      updateActivityType({ ...selectedType, ...data } as ActivityType);
     } else {
-      setActivityTypes(prev => [...prev, { 
-        id: `at-${Date.now()}`, 
-        name: data.name!, 
-        createdAt: new Date().toISOString().split('T')[0] 
-      }]);
+      addActivityType(data as Omit<ActivityType, 'id' | 'createdAt'>);
     }
     setModalOpen(false);
   };

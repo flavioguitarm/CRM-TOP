@@ -195,7 +195,7 @@ const EventModal: React.FC<{
 };
 
 const EventosAdmin: React.FC = () => {
-  const { events, deleteEvent, classes, updateEvent, addEvent, institutions, addEventActivity, currentUser, activityTypes, setActivityTypes, moveToTrash } = useData();
+  const { events, deleteEvent, classes, updateEvent, addEvent, institutions, addEventActivity, currentUser, activityTypes, setActivityTypes, addActivityType, updateActivityType, moveToTrash } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'events' | 'types'>('events');
   const [selectedEvtId, setSelectedEvtId] = useState<string | null>(null);
@@ -266,13 +266,9 @@ const EventosAdmin: React.FC = () => {
 
   const handleSaveType = (data: Partial<ActivityType>) => {
     if (itemToEdit) {
-      setActivityTypes(prev => prev.map(t => t.id === itemToEdit.id ? { ...t, ...data } : t));
+      updateActivityType({ ...itemToEdit, ...data } as ActivityType);
     } else {
-      setActivityTypes(prev => [...prev, { 
-        id: `at-${Date.now()}`, 
-        name: data.name!, 
-        createdAt: new Date().toISOString().split('T')[0] 
-      }]);
+      addActivityType(data as Omit<ActivityType, 'id' | 'createdAt'>);
     }
     setTypeModalOpen(false);
   };

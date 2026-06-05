@@ -59,6 +59,18 @@ interface DataContextType {
   addCourse: (data: Omit<Course, 'id' | 'createdAt'>) => Promise<void>;
   updateCourse: (course: Course) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
+  addUser: (data: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  addProductCategory: (data: Omit<ProductCategory, 'id' | 'createdAt'>) => Promise<void>;
+  updateProductCategory: (category: ProductCategory) => Promise<void>;
+  deleteProductCategory: (id: string) => Promise<void>;
+  addProduct: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  addActivityType: (data: Omit<ActivityType, 'id' | 'createdAt'>) => Promise<void>;
+  updateActivityType: (activityType: ActivityType) => Promise<void>;
+  deleteActivityType: (id: string) => Promise<void>;
   addClass: (newClass: ClassRoom) => Promise<void>;
   updateClass: (updatedClass: ClassRoom) => Promise<void>;
   deleteClass: (classId: string) => void;
@@ -211,14 +223,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => subscription.unsubscribe();
   }, []);
 
-  const [users, setUsers] = useState<User[]>(() => load('users', MOCK_USERS));
-
   // ── Entidades migradas para Supabase (sem localStorage) ──────────────────
+  const [users, setUsers]               = useState<User[]>([]);
   const [clients, setClients]           = useState<Client[]>([]);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [courses, setCourses]           = useState<Course[]>([]);
   const [classes, setClasses]           = useState<ClassRoom[]>([]);
   const [funnels, setFunnels]           = useState<Funnel[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  const [products, setProducts]         = useState<Product[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
 
   // Fetch: institutions
   useEffect(() => {
@@ -316,15 +330,87 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
   }, [tenantId]);
 
-  const [productCategories, setProductCategories] = useState<ProductCategory[]>(() => load('productCategories', [
-    { id: 'cat-1', name: 'Adesão', createdAt: today },
-    { id: 'cat-2', name: 'Convite Extra', createdAt: today },
-    { id: 'cat-3', name: 'Mesa Extra', createdAt: today }
-  ]));
-  const [products, setProducts] = useState<Product[]>(() => load('products', MOCK_PRODUCTS));
+  // Fetch: users
+  useEffect(() => {
+    if (!tenantId) { setUsers([]); return; }
+    supabase
+      .from('users')
+      .select('id, name, email, role, phone, password, status, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('users fetch:', error.message); return; }
+        setUsers((data ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          email:     r.email,
+          role:      r.role as UserRole,
+          phone:     r.phone ?? '',
+          password:  r.password ?? '',
+          status:    r.status as 'ATIVO' | 'INATIVO',
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: productCategories
+  useEffect(() => {
+    if (!tenantId) { setProductCategories([]); return; }
+    supabase
+      .from('product_categories')
+      .select('id, name, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('productCategories fetch:', error.message); return; }
+        setProductCategories((data ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: products
+  useEffect(() => {
+    if (!tenantId) { setProducts([]); return; }
+    supabase
+      .from('products')
+      .select('id, name, category_id, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('products fetch:', error.message); return; }
+        setProducts((data ?? []).map(r => ({
+          id:         r.id,
+          name:       r.name,
+          categoryId: r.category_id,
+          createdAt:  r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: activityTypes
+  useEffect(() => {
+    if (!tenantId) { setActivityTypes([]); return; }
+    supabase
+      .from('activity_types')
+      .select('id, name, color, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('activityTypes fetch:', error.message); return; }
+        setActivityTypes((data ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          color:     r.color ?? undefined,
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
   const [events, setEvents] = useState<Event[]>(() => load('events', MOCK_EVENTS));
   const [tasks, setTasks] = useState<Task[]>(() => load('tasks', []));
-  const [activityTypes, setActivityTypes] = useState<ActivityType[]>(() => load('activityTypes', MOCK_ACTIVITY_TYPES));
   const [sales, setSales] = useState<Sale[]>(() => load('sales', MOCK_SALES));
   const [negotiations, setNegotiations] = useState<ProductNegotiation[]>(() => load('negotiations', []));
   const [csActions, setCsActions] = useState<CSAction[]>(() => load('csActions', []));
@@ -339,16 +425,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
 
-    // institutions, courses, classes, clients e funnels são persistidos no Supabase
+    // users, productCategories, products, activityTypes, institutions, courses, classes, clients e funnels são persistidos no Supabase
     const dataMap = {
-      users, productCategories,
-      products, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
+      events, tasks, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl
     };
 
     Object.entries(dataMap).forEach(([key, value]) => {
       localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
     });
-  }, [users, productCategories, products, events, tasks, activityTypes, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
+  }, [events, tasks, sales, negotiations, csActions, csDailyServices, trash, googleSheetUrl]);
 
   const syncWithGoogleSheet = async () => {
     if (!googleSheetUrl) return;
@@ -459,11 +544,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (tenantId) ids.forEach(id => supabase.from('clients').delete().eq('id', id).eq('tenant_id', tenantId).then());
           handleRemoval(clients, setClients, 'name');
           break;
-        case 'product': handleRemoval(products, setProducts, 'name'); break;
-        case 'productCategory': handleRemoval(productCategories, setProductCategories, 'name'); break;
-        case 'user': handleRemoval(users, setUsers, 'name'); break;
+        case 'product':
+          if (tenantId) ids.forEach(id => supabase.from('products').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(products, setProducts, 'name');
+          break;
+        case 'productCategory':
+          if (tenantId) ids.forEach(id => supabase.from('product_categories').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(productCategories, setProductCategories, 'name');
+          break;
+        case 'user':
+          if (tenantId) ids.forEach(id => supabase.from('users').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(users, setUsers, 'name');
+          break;
         case 'event': handleRemoval(events, setEvents, 'name'); break;
-        case 'activityType': handleRemoval(activityTypes, setActivityTypes, 'name'); break;
+        case 'activityType':
+          if (tenantId) ids.forEach(id => supabase.from('activity_types').delete().eq('id', id).eq('tenant_id', tenantId).then());
+          handleRemoval(activityTypes, setActivityTypes, 'name');
+          break;
         case 'csAction': handleRemoval(csActions, setCsActions, 'type'); break;
         case 'csDailyService': handleRemoval(csDailyServices, setCsDailyServices, 'summary'); break;
     }
@@ -535,11 +632,35 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           setClients(p => [...p, restoredData]);
           break;
-        case 'product': setProducts(p => [...p, restoredData]); break;
-        case 'productCategory': setProductCategories(p => [...p, restoredData]); break;
-        case 'user': setUsers(p => [...p, restoredData]); break;
+        case 'product':
+          if (tenantId) {
+            supabase.from('products').insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name, category_id: restoredData.categoryId })
+              .then(({ error }) => { if (error) console.error('restore product:', error.message); });
+          }
+          setProducts(p => [...p, restoredData]);
+          break;
+        case 'productCategory':
+          if (tenantId) {
+            supabase.from('product_categories').insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name })
+              .then(({ error }) => { if (error) console.error('restore productCategory:', error.message); });
+          }
+          setProductCategories(p => [...p, restoredData]);
+          break;
+        case 'user':
+          if (tenantId) {
+            supabase.from('users').insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name, email: restoredData.email, role: restoredData.role, phone: restoredData.phone ?? '', password: restoredData.password ?? '', status: restoredData.status ?? 'ATIVO' })
+              .then(({ error }) => { if (error) console.error('restore user:', error.message); });
+          }
+          setUsers(p => [...p, restoredData]);
+          break;
         case 'event': setEvents(p => [...p, restoredData]); break;
-        case 'activityType': setActivityTypes(p => [...p, restoredData]); break;
+        case 'activityType':
+          if (tenantId) {
+            supabase.from('activity_types').insert({ id: restoredData.id, tenant_id: tenantId, name: restoredData.name, color: restoredData.color ?? null })
+              .then(({ error }) => { if (error) console.error('restore activityType:', error.message); });
+          }
+          setActivityTypes(p => [...p, restoredData]);
+          break;
         case 'csAction': setCsActions(p => [...p, restoredData]); break;
         case 'csDailyService': setCsDailyServices(p => [...p, restoredData]); break;
     }
@@ -752,6 +873,142 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       deletedAt: new Date().toISOString(),
       originalName: item.name,
     }, ...prev]);
+  };
+
+  // ── users ───────────────────────────────────────────────────────────────────
+
+  const addUser = async (data: Omit<User, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('users')
+      .insert({ tenant_id: tenantId, name: data.name, email: data.email, role: data.role, phone: data.phone ?? '', password: data.password ?? '', status: data.status ?? 'ATIVO' })
+      .select('id, name, email, role, phone, password, status, created_at')
+      .single();
+    if (error) { console.error('addUser:', error.message); return; }
+    setUsers(prev => [...prev, { id: row.id, name: row.name, email: row.email, role: row.role as UserRole, phone: row.phone ?? '', password: row.password ?? '', status: row.status as 'ATIVO' | 'INATIVO', createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateUser = async (user: User) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('users')
+      .update({ name: user.name, email: user.email, role: user.role, phone: user.phone ?? '', password: user.password ?? '', status: user.status })
+      .eq('id', user.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateUser:', error.message); return; }
+    setUsers(prev => prev.map(u => u.id === user.id ? user : u));
+  };
+
+  const deleteUser = async (id: string) => {
+    if (!tenantId) return;
+    const item = users.find(u => u.id === id);
+    if (!item) return;
+    const { error } = await supabase.from('users').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteUser:', error.message); return; }
+    setUsers(prev => prev.filter(u => u.id !== id));
+    setTrash(prev => [{ id: `trash-${Date.now()}-${Math.random()}`, entityType: 'user', data: item, deletedAt: new Date().toISOString(), originalName: item.name }, ...prev]);
+  };
+
+  // ── productCategories ────────────────────────────────────────────────────────
+
+  const addProductCategory = async (data: Omit<ProductCategory, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('product_categories')
+      .insert({ tenant_id: tenantId, name: data.name })
+      .select('id, name, created_at')
+      .single();
+    if (error) { console.error('addProductCategory:', error.message); return; }
+    setProductCategories(prev => [...prev, { id: row.id, name: row.name, createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateProductCategory = async (category: ProductCategory) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('product_categories')
+      .update({ name: category.name })
+      .eq('id', category.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateProductCategory:', error.message); return; }
+    setProductCategories(prev => prev.map(c => c.id === category.id ? category : c));
+  };
+
+  const deleteProductCategory = async (id: string) => {
+    if (!tenantId) return;
+    const item = productCategories.find(c => c.id === id);
+    if (!item) return;
+    const { error } = await supabase.from('product_categories').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteProductCategory:', error.message); return; }
+    setProductCategories(prev => prev.filter(c => c.id !== id));
+    setTrash(prev => [{ id: `trash-${Date.now()}-${Math.random()}`, entityType: 'productCategory', data: item, deletedAt: new Date().toISOString(), originalName: item.name }, ...prev]);
+  };
+
+  // ── products ─────────────────────────────────────────────────────────────────
+
+  const addProduct = async (data: Omit<Product, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('products')
+      .insert({ tenant_id: tenantId, name: data.name, category_id: data.categoryId })
+      .select('id, name, category_id, created_at')
+      .single();
+    if (error) { console.error('addProduct:', error.message); return; }
+    setProducts(prev => [...prev, { id: row.id, name: row.name, categoryId: row.category_id, createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateProduct = async (product: Product) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('products')
+      .update({ name: product.name, category_id: product.categoryId })
+      .eq('id', product.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateProduct:', error.message); return; }
+    setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!tenantId) return;
+    const item = products.find(p => p.id === id);
+    if (!item) return;
+    const { error } = await supabase.from('products').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteProduct:', error.message); return; }
+    setProducts(prev => prev.filter(p => p.id !== id));
+    setTrash(prev => [{ id: `trash-${Date.now()}-${Math.random()}`, entityType: 'product', data: item, deletedAt: new Date().toISOString(), originalName: item.name }, ...prev]);
+  };
+
+  // ── activityTypes ────────────────────────────────────────────────────────────
+
+  const addActivityType = async (data: Omit<ActivityType, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('activity_types')
+      .insert({ tenant_id: tenantId, name: data.name, color: data.color ?? null })
+      .select('id, name, color, created_at')
+      .single();
+    if (error) { console.error('addActivityType:', error.message); return; }
+    setActivityTypes(prev => [...prev, { id: row.id, name: row.name, color: row.color ?? undefined, createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateActivityType = async (activityType: ActivityType) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('activity_types')
+      .update({ name: activityType.name, color: activityType.color ?? null })
+      .eq('id', activityType.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateActivityType:', error.message); return; }
+    setActivityTypes(prev => prev.map(a => a.id === activityType.id ? activityType : a));
+  };
+
+  const deleteActivityType = async (id: string) => {
+    if (!tenantId) return;
+    const item = activityTypes.find(a => a.id === id);
+    if (!item) return;
+    const { error } = await supabase.from('activity_types').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteActivityType:', error.message); return; }
+    setActivityTypes(prev => prev.filter(a => a.id !== id));
+    setTrash(prev => [{ id: `trash-${Date.now()}-${Math.random()}`, entityType: 'activityType', data: item, deletedAt: new Date().toISOString(), originalName: item.name }, ...prev]);
   };
 
   // ── classes ─────────────────────────────────────────────────────────────────
@@ -1046,6 +1303,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateClientStage, addClientActivity, addClient, updateClient,
       addInstitution, updateInstitution, deleteInstitution,
       addCourse, updateCourse, deleteCourse,
+      addUser, updateUser, deleteUser,
+      addProductCategory, updateProductCategory, deleteProductCategory,
+      addProduct, updateProduct, deleteProduct,
+      addActivityType, updateActivityType, deleteActivityType,
       addClass, updateClass, deleteClass, addEvent, updateEvent, addEventActivity, deleteEvent,
       addTask, updateTask, toggleTask, deleteTask,
       canDeleteEntity, updateFunnel, addFunnel, deleteFunnel, isStageOccupied,

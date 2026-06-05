@@ -91,7 +91,7 @@ const ProductModal: React.FC<{
 };
 
 const ProdutosAdmin: React.FC = () => {
-  const { products, setProducts, productCategories, setProductCategories, moveToTrash } = useData();
+  const { products, setProducts, productCategories, setProductCategories, addProduct, updateProduct, deleteProduct, addProductCategory, updateProductCategory, moveToTrash } = useData();
   const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
   const [selectedProdId, setSelectedProdId] = useState<string | null>(null);
   const [prodModalOpen, setProdModalOpen] = useState(false);
@@ -124,31 +124,28 @@ const ProdutosAdmin: React.FC = () => {
 
   const handleSaveProduct = (data: Partial<Product>) => {
     if (itemToEdit) {
-      setProducts(p => p.map(i => i.id === itemToEdit.id ? { ...i, ...data } as Product : i));
+      updateProduct({ ...itemToEdit, ...data } as Product);
     } else {
-      setProducts(p => [...p, { ...data, id: `p-${Date.now()}`, createdAt: new Date().toISOString().split('T')[0] } as Product]);
+      addProduct(data as Omit<Product, 'id' | 'createdAt'>);
     }
     setProdModalOpen(false);
   };
 
   const handleSaveCategory = (data: Partial<ProductCategory>) => {
     if (itemToEdit) {
-      setProductCategories(p => p.map(i => i.id === itemToEdit.id ? { ...i, ...data } as ProductCategory : i));
+      updateProductCategory({ ...itemToEdit, ...data } as ProductCategory);
     } else {
-      setProductCategories(p => [...p, { ...data, id: `cat-${Date.now()}`, createdAt: new Date().toISOString().split('T')[0] } as ProductCategory]);
+      addProductCategory(data as Omit<ProductCategory, 'id' | 'createdAt'>);
     }
     setCatModalOpen(false);
   };
 
   const handleBulkImport = (data: any[]) => {
-    const today = new Date().toISOString().split('T')[0];
     data.forEach(item => {
-      setProducts(p => [...p, {
-        ...item,
-        id: `p-${Date.now()}-${Math.random()}`,
+      addProduct({
+        name: item.name,
         categoryId: item.categoryId || productCategories[0]?.id || '',
-        createdAt: today
-      } as Product]);
+      });
     });
   };
 
@@ -213,7 +210,7 @@ const ProdutosAdmin: React.FC = () => {
                      
                      <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2">
                        <button onClick={(e) => { e.stopPropagation(); setItemToEdit(prod); setProdModalOpen(true); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Edit3 size={16} /></button>
-                       <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) setProducts(p => p.filter(i => i.id !== prod.id)); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
+                       <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) deleteProduct(prod.id); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
                      </div>
                    </div>
                  );
