@@ -106,7 +106,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(MOCK_USERS[0]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const [users, setUsers] = useState<User[]>(() => load('users', MOCK_USERS));

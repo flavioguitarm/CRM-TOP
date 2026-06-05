@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider, useData } from './store';
+import { AuthProvider, useAuth } from './src/hooks/useAuth';
+import LoginPage from './src/components/Auth/LoginPage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -21,33 +23,74 @@ import TrashPage from './pages/Admin/Trash';
 import DatabaseAdmin from './pages/Admin/Database';
 import AgendaView from './pages/Agenda';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, sidebarCollapsed } = useData();
-  
-  if (!currentUser) {
+// ─── Sincroniza sessão Supabase → currentUser do store ───────────────────────
+
+const AuthSync: React.FC = () => {
+  const { supabaseUser } = useAuth();
+  const { users, setCurrentUser } = useData();
+
+  useEffect(() => {
+    if (!supabaseUser) {
+      setCurrentUser(null);
+      return;
+    }
+
+    // Busca o usuário pelo e-mail cadastrado no store (dados locais/mock)
+    const matched = users.find(
+      u => u.email.toLowerCase() === supabaseUser.email?.toLowerCase()
+    );
+
+    if (matched) {
+      setCurrentUser(matched);
+    } else {
+      // Fallback: cria um perfil mínimo a partir da sessão Supabase
+      setCurrentUser({
+        id:        supabaseUser.id,
+        name:      supabaseUser.user_metadata?.name ?? supabaseUser.email ?? 'Usuário',
+        email:     supabaseUser.email ?? '',
+        role:      supabaseUser.user_metadata?.role ?? 'VISUALIZADOR',
+        phone:     supabaseUser.user_metadata?.phone ?? '',
+        password:  '',
+        status:    'ATIVO',
+        createdAt: supabaseUser.created_at,
+      });
+    }
+  }, [supabaseUser, users]);
+
+  return null;
+};
+
+// ─── Guard: redireciona para /login se não autenticado ───────────────────────
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { session, loading } = useAuth();
+
+  if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-white p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
-          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-inner">
-            <GraduationCap size={40} className="text-amber-600" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2 text-center text-slate-900">Login CRM Formaturas</h1>
-          <p className="text-slate-500 text-center mb-8">Gestão comercial inteligente para empresas de formatura.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2"
-          >
-            Entrar como Administrador
-          </button>
-        </div>
+      <div className="h-screen flex items-center justify-center bg-slate-900">
+        <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  if (!session) return <LoginPage />;
+
+  return <>{children}</>;
+};
+
+// ─── Layout principal (apenas para rotas protegidas) ─────────────────────────
+
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { sidebarCollapsed } = useData();
+
   return (
     <div className="min-h-screen flex bg-slate-50 w-full overflow-x-hidden">
       <Sidebar />
-      <div className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${
+          sidebarCollapsed ? 'ml-20' : 'ml-64'
+        }`}
+      >
         <Header />
         <main className="pt-16 min-h-screen w-full flex flex-col">
           <div className="p-4 md:p-8 flex-1 w-full max-w-full overflow-x-auto">
@@ -59,65 +102,45 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-const GraduationCap = ({ size, className }: { size: number, className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
-  </svg>
+// ─── Rotas ───────────────────────────────────────────────────────────────────
+
+const AppRoutes: React.FC = () => (
+  <Routes>
+    <Route path="/"                      element={<Dashboard />} />
+    <Route path="/funil"                 element={<FunnelView />} />
+    <Route path="/clientes"              element={<ClientsView />} />
+    <Route path="/acoes-cs"              element={<CSActionsView />} />
+    <Route path="/atendimentos-cs"       element={<CSDailyServicesView />} />
+    <Route path="/agenda"                element={<AgendaView />} />
+    <Route path="/admin/turmas"          element={<TurmasAdmin />} />
+    <Route path="/admin/usuarios"        element={<UsersAdmin />} />
+    <Route path="/admin/funis"           element={<FunnelConfig />} />
+    <Route path="/admin/instituicoes"    element={<InstituicoesAdmin />} />
+    <Route path="/admin/cursos"          element={<CursosAdmin />} />
+    <Route path="/admin/produtos"        element={<ProdutosAdmin />} />
+    <Route path="/admin/eventos"         element={<EventosAdmin />} />
+    <Route path="/admin/tipos-atividade" element={<ActivityTypesAdmin />} />
+    <Route path="/admin/seguranca"       element={<DatabaseAdmin />} />
+    <Route path="/admin/lixeira"         element={<TrashPage />} />
+    <Route path="/admin/*"               element={<Navigate to="/" replace />} />
+  </Routes>
 );
 
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/funil" element={<FunnelView />} />
-      <Route path="/clientes" element={<ClientsView />} />
-      <Route path="/acoes-cs" element={<CSActionsView />} />
-      <Route path="/atendimentos-cs" element={<CSDailyServicesView />} />
-      <Route path="/agenda" element={<AgendaView />} />
-      <Route path="/admin/turmas" element={<TurmasAdmin />} />
-      <Route path="/admin/usuarios" element={<UsersAdmin />} />
-      <Route path="/admin/funis" element={<FunnelConfig />} />
-      <Route path="/admin/instituicoes" element={<InstituicoesAdmin />} />
-      <Route path="/admin/cursos" element={<CursosAdmin />} />
-      <Route path="/admin/produtos" element={<ProdutosAdmin />} />
-      <Route path="/admin/eventos" element={<EventosAdmin />} />
-      <Route path="/admin/tipos-atividade" element={<ActivityTypesAdmin />} />
-      <Route path="/admin/seguranca" element={<DatabaseAdmin />} />
-      <Route path="/admin/lixeira" element={<TrashPage />} />
-      <Route path="/admin/*" element={
-        <div className="p-12 text-center text-slate-400">
-          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Navigate to="/" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-600">Funcionalidade em desenvolvimento</h2>
-          <p>Esta tela faz parte da estrutura administrativa prevista no Cadastro Geral.</p>
-        </div>
-      } />
-    </Routes>
-  );
-};
+// ─── Raiz ─────────────────────────────────────────────────────────────────────
 
-const App: React.FC = () => {
-  return (
+const App: React.FC = () => (
+  <AuthProvider>
     <DataProvider>
       <Router>
-        <Layout>
-          <AppRoutes />
-        </Layout>
+        <AuthSync />
+        <ProtectedRoute>
+          <Layout>
+            <AppRoutes />
+          </Layout>
+        </ProtectedRoute>
       </Router>
     </DataProvider>
-  );
-};
+  </AuthProvider>
+);
 
 export default App;

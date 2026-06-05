@@ -1,11 +1,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useData } from '../store';
+import { useAuth } from '../src/hooks/useAuth';
 import { LogOut, ChevronDown, User, Shield, Bell, Clock, Calendar, Zap, ListTodo, ChevronRight, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Header: React.FC = () => {
-  const { currentUser, setCurrentUser, sidebarCollapsed, tasks, events, classes } = useData();
+  const { currentUser, sidebarCollapsed, tasks, events, classes } = useData();
+  const { signOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifyOpen, setIsNotifyOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -174,8 +176,8 @@ const Header: React.FC = () => {
               </button>
               
               <div className="border-t border-slate-50 mt-1 pt-1">
-                <button 
-                  onClick={() => setCurrentUser(null)}
+                <button
+                  onClick={() => signOut()}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors font-bold"
                 >
                   <LogOut size={18} />
