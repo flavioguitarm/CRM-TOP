@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Gerado em: 2026-06-05  
+> Atualizado em: 2026-06-05 (Sessão 2)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -32,6 +32,7 @@ CRM-TOP/
 ├── index.tsx                       # Entry point React
 ├── vite.config.ts                  # Alias @ → raiz do projeto
 ├── .env.local                      # Variáveis VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+├── CONTEXT.md                      # Este arquivo — briefing de retomada
 │
 ├── src/
 │   ├── lib/supabase.ts             # Cliente Supabase (createClient com variáveis de ambiente)
@@ -66,7 +67,7 @@ CRM-TOP/
 │
 └── supabase/
     └── migrations/
-        └── 001_initial_schema.sql  # Schema completo com RLS por tenant_id
+        └── 001_initial_schema.sql  # Schema completo (RLS desativada para dev — ver abaixo)
 ```
 
 ---
@@ -77,8 +78,8 @@ CRM-TOP/
 - `AuthProvider` envolve toda a árvore em `App.tsx`
 - `ProtectedRoute` exibe spinner → `LoginPage` → app conforme estado de sessão
 - `AuthSync` (componente interno em `App.tsx`) sincroniza `session.user` → `currentUser` do store:
-  - Busca por e-mail no array `users` do store
-  - Fallback: cria perfil mínimo com `role: 'ADMIN'` (padrão até gerenciamento de papéis via DB)
+  - Busca o usuário por e-mail no array `users` do store
+  - Fallback: cria perfil mínimo com `role: 'ADMIN'` (padrão enquanto tabela `users` não for fonte de verdade)
 - Logout em `Header.tsx` chama `useAuth().signOut()`
 - `tenantId` no store = `supabase.auth.getSession().user.id` (usuário Auth = tenant)
 
@@ -114,91 +115,127 @@ Tabelas criadas com **`tenant_id UUID NOT NULL`** em todas:
 | `sales` | Vendas realizadas |
 | `product_negotiations` | Negociações em pipeline |
 
-**RLS:** ativa em todas as tabelas.  
-- Tabelas com `tenant_id` direto: `USING (tenant_id = current_setting('app.current_tenant_id')::uuid)`  
-- Tabelas junction (`class_courses`, `funnel_responsible_users`): `EXISTS (SELECT 1 FROM parent_table WHERE ... tenant_id = ...)`
+### ⚠️ RLS — Status atual: DESATIVADA para desenvolvimento
+
+A RLS foi **desativada em todas as tabelas** via SQL executado direto no Supabase Dashboard:
+
+```sql
+ALTER TABLE users                   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE institutions            DISABLE ROW LEVEL SECURITY;
+ALTER TABLE courses                 DISABLE ROW LEVEL SECURITY;
+ALTER TABLE product_categories      DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products                DISABLE ROW LEVEL SECURITY;
+ALTER TABLE classes                 DISABLE ROW LEVEL SECURITY;
+ALTER TABLE class_courses           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE class_products          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE class_timeline_events   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE funnels                 DISABLE ROW LEVEL SECURITY;
+ALTER TABLE funnel_stages           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE funnel_responsible_users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE clients                 DISABLE ROW LEVEL SECURITY;
+ALTER TABLE client_activities       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE client_tasks            DISABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_types          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE events                  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE event_activities        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cs_actions              DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cs_action_activities    DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cs_daily_services       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sales                   DISABLE ROW LEVEL SECURITY;
+ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
+```
+
+**Motivo:** A política criada no schema exige `set_config('app.current_tenant_id', uuid, true)` na sessão antes de cada query, o que ainda não foi implementado no cliente Supabase. Com RLS ativa sem esse config, todas as queries retornavam zero resultados.
+
+**Para reativar no futuro:** implementar um wrapper no `supabase.ts` que chame `rpc('set_tenant', { tid: tenantId })` antes das queries, ou usar `supabase.rpc` com uma função PostgreSQL que faça o `set_config`. As políticas já estão criadas no schema — basta reativar.
 
 ---
 
 ## Migração store → Supabase
 
-### ✅ Entidades já migradas
+### Padrão adotado em todas as entidades migradas
 
-| Entidade | Tabelas Supabase | CRUD no store |
-|---|---|---|
-| `institutions` | `institutions` | `addInstitution`, `updateInstitution`, `deleteInstitution` |
-| `courses` | `courses` | `addCourse`, `updateCourse`, `deleteCourse` |
-| `classes` | `classes` + `class_courses` + `class_products` + `class_timeline_events` | `addClass`, `updateClass`, `deleteClass`, `addClassProduct`, `updateClassProduct`, `removeClassProduct` |
-| `clients` | `clients` + `client_activities` | `addClient`, `updateClient`, `updateClientStage`, `addClientActivity` |
-| `funnels` | `funnels` + `funnel_stages` + `funnel_responsible_users` | `addFunnel`, `updateFunnel`, `deleteFunnel` |
-
-**Padrão de migração adotado:**
 - Estado inicia como `[]` (sem `localStorage`)
 - `useEffect` dispara fetch quando `tenantId` muda
 - Funções CRUD: **atualização otimista do estado local** + **fire-and-forget no Supabase**
 - `moveToTrash`: deleta do Supabase antes de mover para lixo local
 - `restoreFromTrash`: re-insere no Supabase ao restaurar
-- Interface do Context **inalterada** (nenhuma página precisou ser modificada, exceto Instituições e Cursos que chamavam `setInstitutions`/`setCourses` diretamente)
+- Interface do Context **inalterada** para os consumidores (páginas não precisam mudar)
+- Mappers `mapXxxRow(row)` puros fora do Provider — convertem snake_case do Supabase → camelCase TS
 
-### ❌ Entidades ainda no localStorage
+---
 
-| Entidade | Estado no store | Observações |
+### ✅ Entidades migradas (Sessões 1 e 2)
+
+| Entidade | Tabelas Supabase | Funções CRUD no store | Sessão |
+|---|---|---|---|
+| `institutions` | `institutions` | `addInstitution`, `updateInstitution`, `deleteInstitution` | 1 |
+| `courses` | `courses` | `addCourse`, `updateCourse`, `deleteCourse` | 1 |
+| `classes` | `classes` + `class_courses` + `class_products` + `class_timeline_events` | `addClass`, `updateClass`, `deleteClass`, `addClassProduct`, `updateClassProduct`, `removeClassProduct` | 1 |
+| `clients` | `clients` + `client_activities` | `addClient`, `updateClient`, `updateClientStage`, `addClientActivity` | 1 |
+| `funnels` | `funnels` + `funnel_stages` + `funnel_responsible_users` | `addFunnel`, `updateFunnel`, `deleteFunnel` | 1 |
+| `users` | `users` | `setUsers` (sem CRUD dedicado ainda — ver nota) | 2 |
+| `productCategories` | `product_categories` | `addProductCategory`, `updateProductCategory`, `deleteProductCategory` | 2 |
+| `products` | `products` | `addProduct`, `updateProduct`, `deleteProduct` | 2 |
+| `activityTypes` | `activity_types` | `addActivityType`, `updateActivityType`, `deleteActivityType` | 2 |
+
+> **Nota sobre `users`:** o fetch está implementado (o store carrega users do Supabase), mas as funções de escrita (`addUser`, `updateUser`, `deleteUser`) ainda precisam ser criadas — a página `Admin/Users.tsx` atualmente usa `setUsers` direto. Isso ficou pendente para não criar atrito com o sistema de auth.
+
+---
+
+### ❌ Entidades ainda no localStorage — próximas a migrar
+
+| Entidade | Estado no store | Tabela(s) no Supabase |
 |---|---|---|
-| `users` | `useState(() => load('users', MOCK_USERS))` | Tabela `users` existe no DB; aguarda migração |
-| `productCategories` | `useState(() => load(...))` | Tabela `product_categories` existe |
-| `products` | `useState(() => load(...))` | Tabela `products` existe |
-| `events` | `useState(() => load(...))` | Tabela `events` + `event_activities` existem |
-| `activityTypes` | `useState(() => load(...))` | Tabela `activity_types` existe |
-| `tasks` | `useState(() => load(...))` | Tabela `client_tasks` existe |
-| `sales` | `useState(() => load(...))` | Tabela `sales` existe |
-| `negotiations` | `useState(() => load(...))` | Tabela `product_negotiations` existe |
-| `csActions` | `useState(() => load(...))` | Tabela `cs_actions` + `cs_action_activities` existem |
-| `csDailyServices` | `useState(() => load(...))` | Tabela `cs_daily_services` existe |
+| `events` | `useState(() => load(...))` | `events` + `event_activities` |
+| `csActions` | `useState(() => load(...))` | `cs_actions` + `cs_action_activities` |
+| `csDailyServices` | `useState(() => load(...))` | `cs_daily_services` |
+| `sales` | `useState(() => load(...))` | `sales` |
+| `negotiations` | `useState(() => load(...))` | `product_negotiations` |
+| `tasks` | `useState(() => load(...))` | `client_tasks` |
 | `trash` | `useState(() => load(...))` | Frontend-only (sem tabela no DB) |
 
 ---
 
-## Arquivos-chave modificados nesta sessão
+## Próxima tarefa — Bloco 2 (Operacional)
 
-```
-store.tsx                       # Principal — context com migração progressiva
-App.tsx                         # AuthProvider, AuthSync, ProtectedRoute, fallback role ADMIN
-components/Header.tsx           # signOut via useAuth (removido setCurrentUser)
-pages/Admin/Instituicoes.tsx    # Usa addInstitution / updateInstitution / deleteInstitution
-pages/Admin/Cursos.tsx          # Usa addCourse / updateCourse / deleteCourse
-src/lib/supabase.ts             # Cliente Supabase
-src/hooks/useAuth.ts            # AuthProvider + useAuth
-src/components/Auth/LoginPage.tsx  # Tela de login
-supabase/migrations/001_initial_schema.sql  # Schema completo
-```
+Migrar as seguintes entidades seguindo o mesmo padrão já estabelecido:
+
+### `events` + `event_activities`
+- Fetch: `supabase.from('events').select('*, event_activities(*)')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapEventRow(row)` → `Event` (com `activities: EventActivity[]` embutidas)
+- CRUD: atualizar `addEvent`, `updateEvent`, `deleteEvent`, `addEventActivity` para fire-and-forget
+- Atenção: `startDateTime` e `endDateTime` são TIMESTAMPTZ no DB, string ISO no TS
+
+### `csActions` + `cs_action_activities`
+- Fetch: `supabase.from('cs_actions').select('*, cs_action_activities(*)')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapCSActionRow(row)` → `CSAction`
+- CRUD: atualizar `addCSAction`, `updateCSAction`, `deleteCSAction`, `addCSActionActivity`
+- Mapeamento: `classId` ↔ `class_id`, `responsibleUserId` ↔ `responsible_user_id`, etc.
+
+### `csDailyServices`
+- Fetch: `supabase.from('cs_daily_services').select('*')` com `.eq('tenant_id', tenantId)`
+- Mapper: `mapCSDailyServiceRow(row)` → `CSDailyService`
+- CRUD: atualizar `addCSDailyService`, `updateCSDailyService`, `deleteCSDailyService`
+- Atenção: manter a lógica de vínculo retroativo com `clients` ao salvar
 
 ---
 
-## Próxima tarefa sugerida
+## Bloco 3 — Financeiro (após Bloco 2)
 
-**Continuar a migração das entidades restantes**, seguindo a mesma ordem de dependência:
+- `sales` → `sales` (FK para `clients`, `products`, `users`, `classes`, `product_negotiations`)
+- `negotiations` → `product_negotiations`
+- `tasks` → `client_tasks` (FK para `clients`)
 
-### Bloco 1 — Cadastro base (sem dependências externas)
-- `users` → tabela `users` (atenção: role vem do DB, não de user_metadata)
-- `productCategories` → tabela `product_categories`
-- `products` → tabela `products` (depende de `product_categories`)
-- `activityTypes` → tabela `activity_types`
+---
 
-### Bloco 2 — Operacional
-- `events` → tabelas `events` + `event_activities`
-- `csActions` → tabelas `cs_actions` + `cs_action_activities`
-- `csDailyServices` → tabela `cs_daily_services`
+## Limpeza final (após todos os blocos)
 
-### Bloco 3 — Financeiro
-- `sales` → tabela `sales`
-- `negotiations` → tabela `product_negotiations`
-- `tasks` → tabela `client_tasks`
-
-### Após migração completa
-- Remover a função `load()` e o `STORAGE_KEY` do store (localStorage deixa de ser usado)
-- Remover imports de constantes mock (`MOCK_*`) que não forem mais necessários
-- Implementar gerenciamento de papéis (`role`) via tabela `users` no Supabase (hoje o fallback é sempre `ADMIN`)
-- Avaliar implementação de RLS com `set_config('app.current_tenant_id', ...)` no cliente
+- Remover a função `load()` e a constante `STORAGE_KEY` do store
+- Remover imports de `MOCK_*` que não forem mais usados
+- Implementar CRUD dedicado para `users` (hoje usa `setUsers` diretamente)
+- Reativar RLS com suporte a `set_config('app.current_tenant_id', ...)` no cliente
+- Implementar gerenciamento real de papéis via tabela `users` no Supabase (hoje fallback é `ADMIN`)
 
 ---
 
@@ -211,10 +248,18 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-## Observações importantes
+## Observações técnicas importantes
 
-1. **`tenantId`** no store = UUID do usuário autenticado no Supabase Auth. Cada usuário é seu próprio tenant por enquanto.
-2. **RLS no Supabase** está ativada mas requer `set_config('app.current_tenant_id', uuid, true)` na sessão para funcionar. Isso **ainda não foi implementado** no cliente — as queries passam diretamente sem o config, portanto a RLS pode bloquear operações dependendo da configuração do projeto Supabase. Verificar nas configurações do projeto se RLS está sendo aplicado ou se a anon key tem bypass.
-3. **`funnel_stages.order`** é palavra reservada no PostgreSQL — na migration foi criado como `"order"`. O Supabase JS client trata isso automaticamente.
-4. O projeto usa **`HashRouter`** (URLs com `#`) — compatível com deploy estático.
+1. **`tenantId`** no store = UUID do usuário autenticado no Supabase Auth. Cada usuário autenticado é seu próprio tenant até que multi-tenancy real seja implementado.
+
+2. **RLS desativada** — todas as tabelas estão com `DISABLE ROW LEVEL SECURITY` no Supabase. As políticas existem no schema mas não estão sendo aplicadas. O isolamento de dados é feito apenas pelo filtro `.eq('tenant_id', tenantId)` nas queries do cliente.
+
+3. **`funnel_stages.order`** é palavra reservada no PostgreSQL — na migration foi criado como `"order"`. O Supabase JS client trata automaticamente ao fazer select com `order` (sem aspas).
+
+4. O projeto usa **`HashRouter`** (URLs com `#`) — compatível com deploy estático sem configuração de servidor.
+
 5. O alias **`@`** mapeia para a raiz do projeto (configurado em `vite.config.ts` e `tsconfig.json`).
+
+6. **`AuthSync`** em `App.tsx` roda fora do `ProtectedRoute` mas dentro do `Router` e do `DataProvider` — ele é um componente que retorna `null` e serve só para executar o `useEffect` de sincronização.
+
+7. **Importações cruzadas:** `src/hooks/useAuth.ts` importa de `@/src/lib/supabase`. `components/Header.tsx` importa de `../src/hooks/useAuth`. Isso funciona porque o alias `@` aponta para a raiz.
