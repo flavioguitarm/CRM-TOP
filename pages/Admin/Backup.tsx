@@ -6,6 +6,7 @@ import {
   Loader2, Database, FileJson, ShieldCheck,
   RefreshCcw, X, ChevronRight, Info,
 } from 'lucide-react';
+import HelpTooltip from '../../components/HelpTooltip';
 
 // ─── Labels amigáveis para cada tabela ───────────────────────────────────────
 
@@ -210,7 +211,7 @@ const BackupPage: React.FC = () => {
               <Download size={28} />
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Exportar dados</h3>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">Exportar dados <HelpTooltip text="Gera um snapshot completo de todos os dados do seu tenant no Supabase. O arquivo JSON pode ser armazenado como backup de segurança e importado aqui quando necessário." position="bottom" /></h3>
               <p className="text-sm text-slate-500 font-medium mt-1">
                 Busca todos os dados do Supabase e gera um arquivo JSON completo para download.
               </p>
@@ -288,7 +289,7 @@ const BackupPage: React.FC = () => {
               <Upload size={28} />
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Restaurar backup</h3>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">Restaurar backup <HelpTooltip text="Carrega um arquivo JSON exportado por esta ferramenta. ATENÇÃO: apaga todos os dados atuais do tenant antes de restaurar. Use apenas em emergências ou migrações." position="bottom" /></h3>
               <p className="text-sm text-slate-500 font-medium mt-1">
                 Selecione um arquivo de backup para restaurar todos os dados do sistema.
               </p>

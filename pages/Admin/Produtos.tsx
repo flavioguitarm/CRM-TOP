@@ -4,6 +4,7 @@ import { useData } from '../../store';
 import { Product, ProductCategory } from '../../types';
 import { Package, Edit3, Trash2, X, Plus, ShoppingCart, Tag, FileSpreadsheet, Calendar, Download, Layers, Check, PlusCircle, CheckSquare, Square } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import HelpTooltip from '../../components/HelpTooltip';
 import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
@@ -62,17 +63,17 @@ const ProductModal: React.FC<{
         </div>
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome do Item *</label>
-            <input 
-              required 
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-inner" 
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Nome do Item * <HelpTooltip text="Nome comercial do produto ou serviço. Ex: 'Convite Digital', 'Álbum Executivo'. Aparece nas negociações e no perfil do cliente." /></label>
+            <input
+              required
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-inner"
+              value={formData.name}
+              onChange={e => setFormData({...formData, name: e.target.value})}
             />
           </div>
-          
+
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria *</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Categoria * <HelpTooltip text="Agrupa produtos por tipo (Ex: Fotografia, Decoração, Convites). Usado nos filtros do Catálogo e nos relatórios de vendas." /></label>
             <select 
               required
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-amber-500"

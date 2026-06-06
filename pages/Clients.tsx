@@ -8,6 +8,7 @@ import { Client, UserRole, ClassRoom, Campus, Sale, ProductNegotiation } from '.
 import ClientProfileView from '../components/ClientProfileView';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
+import HelpTooltip from '../components/HelpTooltip';
 import * as XLSX from 'xlsx';
 
 // --- Modal de Seleção de Turmas para Exportação ---
@@ -100,7 +101,7 @@ const ExportSelectionModal: React.FC<{
     );
 };
 
-const SearchableSelect: React.FC<{ options: { id: string; label: string }[]; value: string; onChange: (v: string) => void; placeholder: string; label: string; disabled?: boolean; }> = ({ options, value, onChange, placeholder, label, disabled }) => {
+const SearchableSelect: React.FC<{ options: { id: string; label: string }[]; value: string; onChange: (v: string) => void; placeholder: string; label: string; disabled?: boolean; labelExtra?: React.ReactNode; }> = ({ options, value, onChange, placeholder, label, disabled, labelExtra }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,7 +113,7 @@ const SearchableSelect: React.FC<{ options: { id: string; label: string }[]; val
   const selected = options.find(o => o.id === value);
   return (
     <div className={`space-y-1 relative ${disabled ? 'opacity-50' : ''}`} ref={containerRef}>
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">{label}{labelExtra}</label>
       <div className={`w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs flex items-center justify-between shadow-sm transition-all ${disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:border-amber-400 font-bold'}`} onClick={() => !disabled && setIsOpen(!isOpen)}>
         <span className={selected ? 'text-slate-900' : 'text-slate-400 italic'}>{selected ? selected.label : placeholder}</span>
         <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -158,8 +159,28 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
     })) || [];
   }, [institutions, formData.institutionId]);
 
-  const classOptions = classes.map(c => ({ id: c.id, label: c.name }));
+  // Filtra turmas pela instituição selecionada (se houver) — vinculação bidirecional
+  const classOptions = useMemo(() => {
+    const filtered = formData.institutionId
+      ? classes.filter(c => c.institutionId === formData.institutionId)
+      : classes;
+    return filtered.map(c => ({ id: c.id, label: c.name }));
+  }, [classes, formData.institutionId]);
+
   const instOptions = institutions.map(i => ({ id: i.id, label: i.name }));
+
+  // Ao selecionar instituição, limpa turma se ela não pertencer à nova instituição
+  const handleInstChange = (instId: string) => {
+    const currentClass = classes.find(c => c.id === formData.classId);
+    const classStillValid = currentClass && currentClass.institutionId === instId;
+    setFormData(prev => ({
+      ...prev,
+      institutionId: instId,
+      campus: '',
+      classId: classStillValid ? prev.classId : '',
+      courseId: classStillValid ? prev.courseId : '',
+    }));
+  };
   
   const courseOptions = useMemo(() => {
     if (selectedClass) {
@@ -208,11 +229,11 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Dados Pessoais</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Nome Completo *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Nome Completo * <HelpTooltip text="Nome completo do formando conforme constará nos documentos e crachás da formatura." /></label>
                 <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold shadow-inner" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Nascimento</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Nascimento <HelpTooltip text="Data de nascimento. Usada para cálculo de idade e em relatórios de perfil de turma." /></label>
                 <div className="relative group">
                   <input 
                     type="date" 
@@ -228,13 +249,13 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Sexo</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Sexo <HelpTooltip text="Usado em comunicações personalizadas e segmentação de campanhas." /></label>
                 <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
                   <option value="">Escolher...</option><option value="M">Masculino</option><option value="F">Feminino</option><option value="O">Outro</option>
                 </select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">CPF</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">CPF <HelpTooltip text="CPF único por cliente. O sistema bloqueia duplicatas automaticamente para evitar registros repetidos." /></label>
                 <input className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold ${duplicateCheck.cpf ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200'}`} value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} />
                 {duplicateCheck.cpf && <p className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1"><AlertCircle size={10}/> CPF duplicado na base!</p>}
               </div>
@@ -245,12 +266,12 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Contato</h4>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">E-mail *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">E-mail * <HelpTooltip text="E-mail principal para envio de comunicados, propostas e confirmações. Deve ser único na base." /></label>
                 <input required className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold ${duplicateCheck.email ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200'}`} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 {duplicateCheck.email && <p className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1"><AlertCircle size={10}/> E-mail já existe na base!</p>}
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Telefone *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Telefone * <HelpTooltip text="WhatsApp principal. Usado para vincular atendimentos do CS automaticamente ao digitar o número." /></label>
                 <input required className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold ${duplicateCheck.phone ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200'}`} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                 {duplicateCheck.phone && <p className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1"><AlertCircle size={10}/> Telefone já existe na base!</p>}
               </div>
@@ -260,24 +281,25 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
           <section className="space-y-6">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Dados Acadêmicos</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <SearchableSelect
+                label="Turma / Sala"
+                labelExtra={<HelpTooltip text="Ao selecionar a turma, a Instituição e o Curso são preenchidos automaticamente. A lista é filtrada pela Instituição selecionada acima." />}
+                options={classOptions}
+                value={formData.classId || ''}
+                onChange={handleClassChange}
+                placeholder="Buscar turma..."
+              />
+              <SearchableSelect label="Instituição" labelExtra={<HelpTooltip text="Filtra as turmas disponíveis. Ao trocar a instituição, a turma incompatível é desmarcada automaticamente." />} options={instOptions} value={formData.institutionId || ''} onChange={handleInstChange} placeholder="Selecionar..." />
+              <SearchableSelect label="Campus (Unidade)" labelExtra={<HelpTooltip text="Lista de campi da instituição selecionada. Selecione a unidade onde a turma se reúne." />} options={campusOptions} value={formData.campus || ''} onChange={v => setFormData({...formData, campus: v})} placeholder="Lista de campus..." disabled={!formData.institutionId} />
+              <SearchableSelect label="Curso" labelExtra={<HelpTooltip text="Curso de graduação do formando. Quando vinculado a uma turma, exibe apenas os cursos da turma." />} options={courseOptions} value={formData.courseId || ''} onChange={v => setFormData({...formData, courseId: v})} placeholder="Buscar curso..." />
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Turma / Sala</label>
-                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" value={formData.classId || ''} onChange={e => handleClassChange(e.target.value)}>
-                   <option value="">Selecionar Turma...</option>
-                   {classOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              </div>
-              <SearchableSelect label="Instituição" options={instOptions} value={formData.institutionId || ''} onChange={v => setFormData({...formData, institutionId: v, campus: ''})} placeholder="Selecionar..." disabled={!!formData.classId} />
-              <SearchableSelect label="Campus (Unidade)" options={campusOptions} value={formData.campus || ''} onChange={v => setFormData({...formData, campus: v})} placeholder="Lista de campus..." disabled={!formData.institutionId} />
-              <SearchableSelect label="Curso" options={courseOptions} value={formData.courseId || ''} onChange={v => setFormData({...formData, courseId: v})} placeholder="Buscar curso..." />
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Turno</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Turno <HelpTooltip text="Período do dia em que o formando assiste às aulas. Útil para organizar eventos e reuniões de apresentação." /></label>
                 <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" value={formData.shift} onChange={e => setFormData({...formData, shift: e.target.value})}>
                   <option value="">Escolher...</option><option value="Manhã">Manhã</option><option value="Tarde">Tarde</option><option value="Noite">Noite</option><option value="Integral">Integral</option>
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Etiquetas (separar por vírgula)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">Etiquetas <HelpTooltip text="Tags livres separadas por vírgula. Ex: LeadVIP, Ativo, Indicação. Usadas para filtros e segmentação de campanhas." /></label>
                 <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" placeholder="Ex: LeadVIP, Ativo" value={tagsInput} onChange={e => setTagsInput(e.target.value)} />
               </div>
             </div>
@@ -356,21 +378,54 @@ const ClientsView: React.FC = () => {
     }
   };
 
+  // Resolve nome ou ID para entidade — aceita UUID ou busca por nome (case-insensitive)
+  const resolveId = (
+    value: string | undefined,
+    list: { id: string; name: string }[]
+  ): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    // Se já é um UUID válido, retorna direto
+    if (/^[0-9a-f-]{36}$/i.test(trimmed)) return trimmed;
+    // Senão, busca por nome (partial match)
+    const found = list.find(i => i.name.toLowerCase().includes(trimmed.toLowerCase()));
+    return found?.id || '';
+  };
+
   const handleBulkImport = (data: any[], strategy: 'ignore' | 'overwrite') => {
     const today = new Date().toISOString().split('T')[0];
-    
+
     data.forEach(item => {
-      const existingClient = clients.find(c => 
+      // ── Vinculação inteligente: resolve nomes → IDs ──────────────────────────
+      const resolvedClassId  = resolveId(item.classId,       classes       as any[]);
+      const resolvedInstId   = resolveId(item.institutionId,  institutions  as any[]);
+      const resolvedCourseId = resolveId(item.courseId,       courses       as any[]);
+
+      // Se veio turma, usa a instituição e curso dela (prioridade sobre campos explícitos)
+      const linkedClass = resolvedClassId ? classes.find(c => c.id === resolvedClassId) : null;
+      const finalInstId   = linkedClass?.institutionId   || resolvedInstId  || '';
+      const finalCourseId = linkedClass && linkedClass.courseIds.length === 1
+        ? linkedClass.courseIds[0]
+        : resolvedCourseId;
+
+      const enrichedItem = {
+        ...item,
+        classId:       resolvedClassId,
+        institutionId: finalInstId,
+        courseId:      finalCourseId,
+      };
+
+      const existingClient = clients.find(c =>
         (item.cpf && c.cpf === item.cpf) ||
-        (item.email && c.email.toLowerCase() === item.email.toLowerCase()) || 
+        (item.email && c.email.toLowerCase() === item.email.toLowerCase()) ||
         (item.phone && c.phone === item.phone)
       );
-      
+
       if (existingClient) {
           if (strategy === 'overwrite') {
               const updatedClient = {
                   ...existingClient,
-                  ...item,
+                  ...enrichedItem,
                   tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()) : existingClient.tags,
                   id: existingClient.id,
                   activities: existingClient.activities,
@@ -380,7 +435,7 @@ const ClientsView: React.FC = () => {
       } else {
           const newId = `cli-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const newClient = {
-            ...item,
+            ...enrichedItem,
             id: newId,
             activities: [],
             createdAt: today,
@@ -490,9 +545,9 @@ const ClientsView: React.FC = () => {
     { key: 'birthDate', label: 'Nascimento (AAAA-MM-DD)' },
     { key: 'gender', label: 'Gênero' },
     { key: 'tags', label: 'Etiquetas (sep. vírgula)' },
-    { key: 'institutionId', label: 'ID da Instituição' },
-    { key: 'courseId', label: 'ID do Curso' },
-    { key: 'classId', label: 'ID da Turma' },
+    { key: 'institutionId', label: 'Instituição (nome ou ID)' },
+    { key: 'courseId', label: 'Curso (nome ou ID)' },
+    { key: 'classId', label: 'Turma / Sala (nome ou ID) — preenche inst. e curso automaticamente' },
     { key: 'shift', label: 'Turno' }, 
     { key: 'soldProductId', label: 'ID do Produto Vendido' },
     { key: 'soldValue', label: 'Valor da Venda (Ex: 4500.50)' },

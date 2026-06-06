@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useData } from '../../store';
 import { supabase } from '../../src/lib/supabase';
 import { Trash2, RotateCcw, Clock, AlertTriangle, Calendar, Info, ShieldAlert, Eye, EyeOff, Loader2, X, CheckSquare, Square } from 'lucide-react';
+import HelpTooltip from '../../components/HelpTooltip';
 
 const EXPIRY_DAYS = 90;
 const MANUAL_DELETE_DAYS = 30;
@@ -109,7 +110,7 @@ const TrashPage: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Lixeira do Sistema</h1>
+                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">Lixeira do Sistema <HelpTooltip text={`Itens excluídos ficam aqui por até ${EXPIRY_DAYS} dias e podem ser restaurados a qualquer momento. A exclusão permanente manual só fica disponível após ${MANUAL_DELETE_DAYS} dias e exige confirmação de senha.`} position="right" /></h1>
                     <p className="text-slate-500 font-medium">Itens expiram automaticamente após {EXPIRY_DAYS} dias. Exclusão manual disponível após {MANUAL_DELETE_DAYS} dias.</p>
                 </div>
                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
@@ -193,20 +194,26 @@ const TrashPage: React.FC = () => {
                                         </td>
                                         <td className="px-8 py-5 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => restoreFromTrash(item.id)}
-                                                    className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all flex items-center gap-1.5"
-                                                >
-                                                    <RotateCcw size={12}/> Restaurar
-                                                </button>
-                                                <button
-                                                    disabled={!eligible}
-                                                    onClick={() => requestPermanentDelete([item.id])}
-                                                    className="bg-rose-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-200 hover:bg-rose-600 transition-all flex items-center gap-1.5 disabled:opacity-20 disabled:cursor-not-allowed"
-                                                    title={eligible ? 'Excluir permanentemente' : `Disponível após ${MANUAL_DELETE_DAYS - daysInTrash} dias`}
-                                                >
-                                                    <Trash2 size={12}/> Excluir
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => restoreFromTrash(item.id)}
+                                                        className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all flex items-center gap-1.5"
+                                                    >
+                                                        <RotateCcw size={12}/> Restaurar
+                                                    </button>
+                                                    <HelpTooltip text="Devolve o item ao sistema exatamente como estava antes, incluindo histórico de atividades vinculadas." position="top" />
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        disabled={!eligible}
+                                                        onClick={() => requestPermanentDelete([item.id])}
+                                                        className="bg-rose-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-200 hover:bg-rose-600 transition-all flex items-center gap-1.5 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                        title={eligible ? 'Excluir permanentemente' : `Disponível após ${MANUAL_DELETE_DAYS - daysInTrash} dias`}
+                                                    >
+                                                        <Trash2 size={12}/> Excluir
+                                                    </button>
+                                                    {!eligible && <HelpTooltip text={`Disponível em ${MANUAL_DELETE_DAYS - daysInTrash} dia(s). O período de carência evita exclusões acidentais.`} position="top" />}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>

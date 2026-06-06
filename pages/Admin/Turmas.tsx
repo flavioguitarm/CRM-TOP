@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import ConfirmModal from '../../components/ConfirmModal';
+import HelpTooltip from '../../components/HelpTooltip';
 import { ClassRoom, ClassProduct } from '../../types';
 import * as XLSX from 'xlsx';
 
@@ -48,12 +49,12 @@ const ClassModal: React.FC<{
         <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome da Turma *</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Nome da Turma * <HelpTooltip text="Identificador único da turma no sistema. Ex: 'Medicina UNIP 2025 — Noite'. Aparece nos filtros de toda a plataforma." /></label>
               <input required className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
-            
+
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Instituição *</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Instituição * <HelpTooltip text="Faculdade ou universidade à qual esta turma pertence. Vincula automaticamente os clientes desta turma à instituição." /></label>
               <select required className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none" value={formData.institutionId} onChange={e => setFormData({...formData, institutionId: e.target.value})}>
                 <option value="">Selecionar...</option>
                 {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
@@ -62,7 +63,7 @@ const ClassModal: React.FC<{
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cursos (Selecione vários segurando Ctrl)</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Cursos <HelpTooltip text="Selecione um ou mais cursos da turma (Ctrl+clique para vários). Ao vincular um cliente à turma, o sistema filtra os cursos disponíveis para ele." position="right" /></label>
             <select multiple className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm h-32 focus:ring-2 focus:ring-amber-500 outline-none" value={formData.courseIds} onChange={e => {
               const values = Array.from(e.target.selectedOptions, (option: any) => option.value);
               setFormData({...formData, courseIds: values});
@@ -73,11 +74,11 @@ const ClassModal: React.FC<{
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ano de Formatura</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Ano de Formatura <HelpTooltip text="Ano previsto para a colação de grau. Usado no Cronograma Mestre e nos cálculos de prazo de eventos." /></label>
               <input type="number" className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.graduationYear} onChange={e => setFormData({...formData, graduationYear: parseInt(e.target.value)})} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mês (6 ou 12)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Semestre <HelpTooltip text="Junho = 1º semestre / Dezembro = 2º semestre. Define quando os eventos da turma serão agendados no Cronograma Mestre." /></label>
               <select className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.graduationMonth} onChange={e => setFormData({...formData, graduationMonth: parseInt(e.target.value)})}>
                 <option value={6}>Junho (1º Semestre)</option>
                 <option value={12}>Dezembro (2º Semestre)</option>
@@ -89,15 +90,15 @@ const ClassModal: React.FC<{
              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Briefcase size={14}/> Atribuição de Responsáveis</h4>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Comercial que Fechou</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Comercial que Fechou <HelpTooltip text="Nome livre do consultor externo ou parceiro que fechou o contrato com esta turma. Apenas para registro histórico." /></label>
                   <input placeholder="Nome do consultor externo" className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none" value={formData.comercialExterno || ''} onChange={e => setFormData({...formData, comercialExterno: e.target.value})} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestor de Projeto Responsável</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Gestor de Projeto <HelpTooltip text="Responsável interno pelo NP (Núcleo de Projetos) desta turma. Campo livre para referência interna." /></label>
                   <input placeholder="Responsável pelo NP" className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none" value={formData.gestorProjeto || ''} onChange={e => setFormData({...formData, gestorProjeto: e.target.value})} />
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consultor CS Responsável</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">Consultor CS Responsável <HelpTooltip text="Usuário do sistema responsável pelo acompanhamento pós-venda desta turma. Aparece no Painel de Ações CS e nos Atendimentos Diários." /></label>
                   <select className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none" value={formData.consultorCSId || ''} onChange={e => setFormData({...formData, consultorCSId: e.target.value})}>
                     <option value="">Não atribuído...</option>
                     {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
