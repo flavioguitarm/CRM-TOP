@@ -236,6 +236,50 @@ function mapCSActionRow(row: any): CSAction {
   };
 }
 
+// ── Mapper: linha do Supabase → Sale ─────────────────────────────────────
+function mapSaleRow(row: any): Sale {
+  return {
+    id:            row.id,
+    clientId:      row.client_id  ?? '',
+    productId:     row.product_id ?? '',
+    sellerId:      row.seller_id  ?? '',
+    value:         row.value      ?? 0,
+    quantity:      row.quantity   ?? 1,
+    date:          row.date       ?? '',
+    classId:       row.class_id   ?? '',
+    negotiationId: row.negotiation_id ?? undefined,
+  };
+}
+
+// ── Mapper: linha do Supabase → ProductNegotiation ────────────────────────
+function mapNegotiationRow(row: any): ProductNegotiation {
+  return {
+    id:        row.id,
+    clientId:  row.client_id  ?? '',
+    productId: row.product_id ?? '',
+    sellerId:  row.seller_id  ?? '',
+    value:     row.value      ?? 0,
+    quantity:  row.quantity   ?? 1,
+    status:    (row.status    ?? 'ABERTO') as NegotiationStatus,
+    createdAt: row.created_at?.split('T')[0] ?? '',
+    closedAt:  row.closed_at  ? row.closed_at.split('T')[0] : undefined,
+  };
+}
+
+// ── Mapper: linha do Supabase → Task ──────────────────────────────────────
+function mapTaskRow(row: any): Task {
+  return {
+    id:          row.id,
+    clientId:    row.client_id   ?? '',
+    title:       row.title       ?? '',
+    date:        row.date        ?? '',
+    time:        row.time        ?? '',
+    description: row.description ?? undefined,
+    completed:   row.completed   ?? false,
+    createdAt:   row.created_at?.split('T')[0] ?? '',
+  };
+}
+
 // ── Mapper: linha do Supabase → CSDailyService ───────────────────────────
 function mapCSDailyServiceRow(row: any): CSDailyService {
   return {
@@ -523,9 +567,53 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
   }, [tenantId]);
 
-  const [tasks, setTasks] = useState<Task[]>(() => load('tasks', []));
-  const [sales, setSales] = useState<Sale[]>(() => load('sales', MOCK_SALES));
-  const [negotiations, setNegotiations] = useState<ProductNegotiation[]>(() => load('negotiations', []));
+  // ── Bloco 3: entidades financeiras migradas para Supabase ────────────────
+  const [sales, setSales]               = useState<Sale[]>([]);
+  const [negotiations, setNegotiations] = useState<ProductNegotiation[]>([]);
+  const [tasks, setTasks]               = useState<Task[]>([]);
+
+  // Fetch: sales
+  useEffect(() => {
+    if (!tenantId) { setSales([]); return; }
+    supabase
+      .from('sales')
+      .select('id, client_id, product_id, seller_id, value, quantity, date, class_id, negotiation_id')
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('sales fetch:', error.message); return; }
+        setSales((data ?? []).map(mapSaleRow));
+      });
+  }, [tenantId]);
+
+  // Fetch: negotiations
+  useEffect(() => {
+    if (!tenantId) { setNegotiations([]); return; }
+    supabase
+      .from('product_negotiations')
+      .select('id, client_id, product_id, seller_id, value, quantity, status, created_at, closed_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('negotiations fetch:', error.message); return; }
+        setNegotiations((data ?? []).map(mapNegotiationRow));
+      });
+  }, [tenantId]);
+
+  // Fetch: tasks
+  useEffect(() => {
+    if (!tenantId) { setTasks([]); return; }
+    supabase
+      .from('client_tasks')
+      .select('id, client_id, title, date, time, description, completed, created_at')
+      .eq('tenant_id', tenantId)
+      .order('date')
+      .then(({ data, error }) => {
+        if (error) { console.error('tasks fetch:', error.message); return; }
+        setTasks((data ?? []).map(mapTaskRow));
+      });
+  }, [tenantId]);
+
   const [trash, setTrash] = useState<TrashItem[]>(() => load('trash', []));
   const [googleSheetUrl, setGoogleSheetUrl] = useState<string>(() => load('googleSheetUrl', ''));
 
@@ -536,16 +624,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
 
-    // users, productCategories, products, activityTypes, institutions, courses, classes, clients, funnels,
-    // events, csActions e csDailyServices são persistidos no Supabase
-    const dataMap = {
-      tasks, sales, negotiations, trash, googleSheetUrl
-    };
-
+    // Todas as entidades de dados são persistidas no Supabase.
+    // Apenas trash (frontend-only) e googleSheetUrl ficam em localStorage.
+    const dataMap = { trash, googleSheetUrl };
     Object.entries(dataMap).forEach(([key, value]) => {
       localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
     });
-  }, [tasks, sales, negotiations, trash, googleSheetUrl]);
+  }, [trash, googleSheetUrl]);
 
   const syncWithGoogleSheet = async () => {
     if (!googleSheetUrl) return;
@@ -610,10 +695,57 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const addTask = (task: Task) => setTasks(prev => [...prev, task]);
-  const updateTask = (task: Task) => setTasks(prev => prev.map(t => t.id === task.id ? task : t));
-  const toggleTask = (taskId: string) => setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
-  const deleteTask = (taskId: string) => setTasks(prev => prev.filter(t => t.id !== taskId));
+  const addTask = (task: Task) => {
+    setTasks(prev => [...prev, task]);
+    if (tenantId) {
+      supabase.from('client_tasks').insert({
+        id:          task.id,
+        tenant_id:   tenantId,
+        client_id:   task.clientId,
+        title:       task.title,
+        date:        task.date        || null,
+        time:        task.time        || null,
+        description: task.description || null,
+        completed:   task.completed   ?? false,
+      }).then(({ error }) => { if (error) console.error('addTask:', error.message); });
+    }
+  };
+
+  const updateTask = (task: Task) => {
+    setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+    if (tenantId) {
+      supabase.from('client_tasks').update({
+        title:       task.title,
+        date:        task.date        || null,
+        time:        task.time        || null,
+        description: task.description || null,
+        completed:   task.completed   ?? false,
+      }).eq('id', task.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateTask:', error.message); });
+    }
+  };
+
+  const toggleTask = (taskId: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const updated = { ...t, completed: !t.completed };
+      if (tenantId) {
+        supabase.from('client_tasks').update({ completed: updated.completed })
+          .eq('id', taskId).eq('tenant_id', tenantId)
+          .then(({ error }) => { if (error) console.error('toggleTask:', error.message); });
+      }
+      return updated;
+    }));
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (tenantId) {
+      supabase.from('client_tasks').delete()
+        .eq('id', taskId).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('deleteTask:', error.message); });
+    }
+  };
 
   const moveToTrash = (entityType: TrashItem['entityType'], ids: string[]) => {
     if (!ids || ids.length === 0) return;
@@ -1355,13 +1487,38 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteFunnel = (id: string) => moveToTrash('funnel', [id]);
   const isStageOccupied = (stageId: string) => clients.some(c => c.stageId === stageId);
 
+  // Helper: sincroniza total_value e purchases_count do cliente no Supabase
+  const syncClientTotals = (clientId: string, newTotal: number, newCount: number) => {
+    if (!tenantId) return;
+    supabase.from('clients')
+      .update({ total_value: newTotal, purchases_count: newCount })
+      .eq('id', clientId).eq('tenant_id', tenantId)
+      .then(({ error }) => { if (error) console.error('syncClientTotals:', error.message); });
+  };
+
   const addSale = (sale: Sale) => {
     setSales(prev => [...prev, sale]);
-    setClients(prev => prev.map(c => c.id === sale.clientId ? { 
-      ...c, 
-      totalValue: (c.totalValue || 0) + (sale.value * (sale.quantity || 1)), 
-      purchasesCount: (c.purchasesCount || 0) + (sale.quantity || 1) 
-    } : c));
+    setClients(prev => prev.map(c => {
+      if (c.id !== sale.clientId) return c;
+      const newTotal = (c.totalValue || 0) + (sale.value * (sale.quantity || 1));
+      const newCount = (c.purchasesCount || 0) + (sale.quantity || 1);
+      syncClientTotals(c.id, newTotal, newCount);
+      return { ...c, totalValue: newTotal, purchasesCount: newCount };
+    }));
+    if (tenantId) {
+      supabase.from('sales').insert({
+        id:             sale.id,
+        tenant_id:      tenantId,
+        client_id:      sale.clientId,
+        product_id:     sale.productId,
+        seller_id:      sale.sellerId,
+        value:          sale.value,
+        quantity:       sale.quantity  ?? 1,
+        date:           sale.date      || today,
+        class_id:       sale.classId,
+        negotiation_id: sale.negotiationId || null,
+      }).then(({ error }) => { if (error) console.error('addSale:', error.message); });
+    }
   };
 
   const updateSale = (updatedSale: Sale) => {
@@ -1369,18 +1526,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!oldSale) return;
     setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
     if (oldSale.value !== updatedSale.value || oldSale.quantity !== updatedSale.quantity) {
-        setClients(prev => prev.map(c => {
-            if (c.id === updatedSale.clientId) {
-                const diffValue = (updatedSale.value * updatedSale.quantity) - (oldSale.value * oldSale.quantity);
-                const diffQty = updatedSale.quantity - oldSale.quantity;
-                return {
-                    ...c,
-                    totalValue: Math.max(0, (c.totalValue || 0) + diffValue),
-                    purchasesCount: Math.max(0, (c.purchasesCount || 0) + diffQty)
-                };
-            }
-            return c;
-        }));
+      setClients(prev => prev.map(c => {
+        if (c.id !== updatedSale.clientId) return c;
+        const diffValue = (updatedSale.value * updatedSale.quantity) - (oldSale.value * oldSale.quantity);
+        const diffQty   = updatedSale.quantity - oldSale.quantity;
+        const newTotal  = Math.max(0, (c.totalValue || 0) + diffValue);
+        const newCount  = Math.max(0, (c.purchasesCount || 0) + diffQty);
+        syncClientTotals(c.id, newTotal, newCount);
+        return { ...c, totalValue: newTotal, purchasesCount: newCount };
+      }));
+    }
+    if (tenantId) {
+      supabase.from('sales').update({
+        product_id:     updatedSale.productId,
+        seller_id:      updatedSale.sellerId,
+        value:          updatedSale.value,
+        quantity:       updatedSale.quantity  ?? 1,
+        date:           updatedSale.date      || today,
+        class_id:       updatedSale.classId,
+        negotiation_id: updatedSale.negotiationId || null,
+      }).eq('id', updatedSale.id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateSale:', error.message); });
     }
   };
 
@@ -1389,34 +1555,69 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!sale) return;
     setSales(prev => prev.filter(s => s.id !== saleId));
     setClients(prev => prev.map(c => {
-        if (c.id === sale.clientId) {
-            return {
-                ...c,
-                totalValue: Math.max(0, (c.totalValue || 0) - (sale.value * sale.quantity)),
-                purchasesCount: Math.max(0, (c.purchasesCount || 0) - sale.quantity)
-            };
-        }
-        return c;
+      if (c.id !== sale.clientId) return c;
+      const newTotal = Math.max(0, (c.totalValue || 0) - (sale.value * sale.quantity));
+      const newCount = Math.max(0, (c.purchasesCount || 0) - sale.quantity);
+      syncClientTotals(c.id, newTotal, newCount);
+      return { ...c, totalValue: newTotal, purchasesCount: newCount };
     }));
     if (sale.negotiationId) {
-        setNegotiations(prev => prev.map(n => n.id === sale.negotiationId ? { ...n, status: 'ABERTO' as NegotiationStatus } : n));
+      setNegotiations(prev => prev.map(n => n.id === sale.negotiationId ? { ...n, status: 'ABERTO' as NegotiationStatus } : n));
+      if (tenantId) {
+        supabase.from('product_negotiations').update({ status: 'ABERTO' })
+          .eq('id', sale.negotiationId).eq('tenant_id', tenantId)
+          .then(({ error }) => { if (error) console.error('deleteSale reopen neg:', error.message); });
+      }
+    }
+    if (tenantId) {
+      supabase.from('sales').delete()
+        .eq('id', saleId).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('deleteSale:', error.message); });
     }
   };
 
-  const addNegotiation = (neg: ProductNegotiation) => setNegotiations(prev => [neg, ...prev]);
+  const addNegotiation = (neg: ProductNegotiation) => {
+    setNegotiations(prev => [neg, ...prev]);
+    if (tenantId) {
+      supabase.from('product_negotiations').insert({
+        id:         neg.id,
+        tenant_id:  tenantId,
+        client_id:  neg.clientId,
+        product_id: neg.productId,
+        seller_id:  neg.sellerId,
+        value:      neg.value    ?? 0,
+        quantity:   neg.quantity ?? 1,
+        status:     neg.status   ?? 'ABERTO',
+        closed_at:  neg.closedAt || null,
+      }).then(({ error }) => { if (error) console.error('addNegotiation:', error.message); });
+    }
+  };
+
   const deleteNegotiation = (negId: string) => {
-      const neg = negotiations.find(n => n.id === negId);
-      if (!neg) return;
-      if (neg.status === 'GANHO') {
-          const associatedSale = sales.find(s => s.negotiationId === neg.id);
-          if (associatedSale) deleteSale(associatedSale.id);
-      }
-      setNegotiations(prev => prev.filter(n => n.id !== negId));
+    const neg = negotiations.find(n => n.id === negId);
+    if (!neg) return;
+    if (neg.status === 'GANHO') {
+      const associatedSale = sales.find(s => s.negotiationId === neg.id);
+      if (associatedSale) deleteSale(associatedSale.id);
+    }
+    setNegotiations(prev => prev.filter(n => n.id !== negId));
+    if (tenantId) {
+      supabase.from('product_negotiations').delete()
+        .eq('id', negId).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('deleteNegotiation:', error.message); });
+    }
   };
 
   const updateNegotiationStatus = (id: string, status: NegotiationStatus) => {
     const closedAt = status !== 'ABERTO' ? new Date().toISOString().split('T')[0] : undefined;
     setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status, closedAt: closedAt || n.closedAt } : n));
+    if (tenantId) {
+      supabase.from('product_negotiations').update({
+        status,
+        closed_at: closedAt || null,
+      }).eq('id', id).eq('tenant_id', tenantId)
+        .then(({ error }) => { if (error) console.error('updateNegotiationStatus:', error.message); });
+    }
   };
 
   const addClassProduct = async (classId: string, cp: ClassProduct) => {

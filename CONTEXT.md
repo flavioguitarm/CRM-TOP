@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-05 (Sessão 3)
+> Atualizado em: 2026-06-05 (Sessão 4)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -165,7 +165,7 @@ ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
 
 ---
 
-### ✅ Entidades migradas (Sessões 1 e 2)
+### ✅ Entidades migradas (Sessões 1–4 — migração COMPLETA)
 
 | Entidade | Tabelas Supabase | Funções CRUD no store | Sessão |
 |---|---|---|---|
@@ -174,69 +174,41 @@ ALTER TABLE product_negotiations    DISABLE ROW LEVEL SECURITY;
 | `classes` | `classes` + `class_courses` + `class_products` + `class_timeline_events` | `addClass`, `updateClass`, `deleteClass`, `addClassProduct`, `updateClassProduct`, `removeClassProduct` | 1 |
 | `clients` | `clients` + `client_activities` | `addClient`, `updateClient`, `updateClientStage`, `addClientActivity` | 1 |
 | `funnels` | `funnels` + `funnel_stages` + `funnel_responsible_users` | `addFunnel`, `updateFunnel`, `deleteFunnel` | 1 |
-| `users` | `users` | `setUsers` (sem CRUD dedicado ainda — ver nota) | 2 |
+| `users` | `users` | `addUser`, `updateUser`, `deleteUser` | 2 |
 | `productCategories` | `product_categories` | `addProductCategory`, `updateProductCategory`, `deleteProductCategory` | 2 |
 | `products` | `products` | `addProduct`, `updateProduct`, `deleteProduct` | 2 |
 | `activityTypes` | `activity_types` | `addActivityType`, `updateActivityType`, `deleteActivityType` | 2 |
-| `events` | `events` + `event_activities` | `addEvent`, `updateEvent`, `deleteEvent`, `addEventActivity` | 3 |
-| `csActions` | `cs_actions` + `cs_action_activities` | `addCSAction`, `updateCSAction`, `deleteCSAction`, `addCSActionActivity` | 3 |
-| `csDailyServices` | `cs_daily_services` | `addCSDailyService`, `updateCSDailyService`, `deleteCSDailyService` | 3 |
-
-> **Nota sobre `users`:** o fetch está implementado (o store carrega users do Supabase), mas as funções de escrita (`addUser`, `updateUser`, `deleteUser`) ainda precisam ser criadas — a página `Admin/Users.tsx` atualmente usa `setUsers` direto. Isso ficou pendente para não criar atrito com o sistema de auth.
+| `events` | `events` + `event_activities` | `addEvent`, `updateEvent`, `deleteEvent`, `addEventActivity` | 2 |
+| `csActions` | `cs_actions` + `cs_action_activities` | `addCSAction`, `updateCSAction`, `deleteCSAction`, `addCSActionActivity` | 2 |
+| `csDailyServices` | `cs_daily_services` | `addCSDailyService`, `updateCSDailyService`, `deleteCSDailyService` | 2 |
+| `sales` | `sales` | `addSale`, `updateSale`, `deleteSale` | 4 |
+| `negotiations` | `product_negotiations` | `addNegotiation`, `deleteNegotiation`, `updateNegotiationStatus` | 4 |
+| `tasks` | `client_tasks` | `addTask`, `updateTask`, `toggleTask`, `deleteTask` | 4 |
 
 > **Nota sobre vínculo retroativo CS:** `addClient` propaga `client_id` para `cs_daily_services` no Supabase (`.update({ client_id })` via `client_phone`) além de atualizar o estado local.
 
+> **Nota sobre totais do cliente:** `addSale` e `deleteSale` atualizam `total_value` e `purchases_count` na tabela `clients` no Supabase via fire-and-forget, além de atualizar o estado local.
+
 ---
 
-### ❌ Entidades ainda no localStorage — próximas a migrar
+### ❌ Ainda no localStorage (apenas utilitários)
 
-| Entidade | Estado no store | Tabela(s) no Supabase |
+| Entidade | Estado no store | Observação |
 |---|---|---|
-| `sales` | `useState(() => load(...))` | `sales` |
-| `negotiations` | `useState(() => load(...))` | `product_negotiations` |
-| `tasks` | `useState(() => load(...))` | `client_tasks` |
-| `trash` | `useState(() => load(...))` | Frontend-only (sem tabela no DB) |
+| `trash` | `useState(() => load(...))` | Frontend-only — sem tabela no DB, permanece em localStorage |
+| `googleSheetUrl` | `useState(() => load(...))` | Configuração de integração — permanece em localStorage |
 
 ---
 
-## Próxima tarefa — Bloco 3 (Financeiro)
+## ✅ Migração completa — limpeza e próximas melhorias
 
-Migrar as seguintes entidades seguindo o mesmo padrão já estabelecido:
+Toda a migração store → Supabase está concluída. Apenas `trash` e `googleSheetUrl` permanecem em localStorage (intencionalmente — são dados frontend-only).
 
-### `sales`
-- Fetch: `supabase.from('sales').select('*')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapSaleRow(row)` → `Sale`
-- CRUD: atualizar `addSale`, `updateSale`, `deleteSale` para fire-and-forget
-- Atenção: `addSale` e `deleteSale` atualizam `totalValue` e `purchasesCount` em `clients` — manter essa lógica e propagar ao Supabase também
-
-### `negotiations`
-- Fetch: `supabase.from('product_negotiations').select('*')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapNegotiationRow(row)` → `ProductNegotiation`
-- CRUD: atualizar `addNegotiation`, `deleteNegotiation`, `updateNegotiationStatus` para fire-and-forget
-- Atenção: `deleteNegotiation` pode chamar `deleteSale` internamente — manter a cascata
-
-### `tasks`
-- Fetch: `supabase.from('client_tasks').select('*')` com `.eq('tenant_id', tenantId)`
-- Mapper: `mapTaskRow(row)` → `Task`
-- CRUD: atualizar `addTask`, `updateTask`, `toggleTask`, `deleteTask` para fire-and-forget
-
----
-
-## Bloco 3 — Financeiro (migrado após Bloco 2 — seção histórica)
-
-- `sales` → `sales` (FK para `clients`, `products`, `users`, `classes`, `product_negotiations`)
-- `negotiations` → `product_negotiations`
-- `tasks` → `client_tasks` (FK para `clients`)
-
----
-
-## Limpeza final (após todos os blocos)
-
-- Remover a função `load()` e a constante `STORAGE_KEY` do store
-- Remover imports de `MOCK_*` que não forem mais usados
-- Implementar CRUD dedicado para `users` (hoje usa `setUsers` diretamente)
-- Reativar RLS com suporte a `set_config('app.current_tenant_id', ...)` no cliente
-- Implementar gerenciamento real de papéis via tabela `users` no Supabase (hoje fallback é `ADMIN`)
+### Limpeza técnica pendente
+- Remover a função `load()` e a constante `STORAGE_KEY` do store (apenas `trash` e `googleSheetUrl` ainda usam)
+- Remover imports de `MOCK_*` que não são mais usados (`MOCK_SALES`, `MOCK_CLIENTS`, etc.)
+- Reativar RLS com suporte a `set_config('app.current_tenant_id', ...)` no cliente Supabase
+- Implementar gerenciamento real de papéis via tabela `users` (hoje fallback é `ADMIN`)
 
 ---
 

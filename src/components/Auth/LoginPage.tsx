@@ -2,7 +2,11 @@ import React, { useState, FormEvent } from 'react';
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
-const LoginPage: React.FC = () => {
+interface Props {
+  onForgotPassword?: () => void;
+}
+
+const LoginPage: React.FC<Props> = ({ onForgotPassword }) => {
   const { signIn } = useAuth();
 
   const [email, setEmail]         = useState('');
@@ -100,6 +104,19 @@ const LoginPage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Link esqueci minha senha */}
+          {onForgotPassword && (
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-xs text-slate-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+          )}
 
           {/* Mensagem de erro */}
           {error && (

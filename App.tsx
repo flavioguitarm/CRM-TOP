@@ -1,9 +1,12 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider, useData } from './store';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
+import { supabase } from './src/lib/supabase';
 import LoginPage from './src/components/Auth/LoginPage';
+import ForgotPasswordPage from './src/components/Auth/ForgotPasswordPage';
+import ResetPasswordPage from './src/components/Auth/ResetPasswordPage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -63,10 +66,25 @@ const AuthSync: React.FC = () => {
   return null;
 };
 
-// ─── Guard: redireciona para /login se não autenticado ───────────────────────
+// ─── Guard + roteamento de views de autenticação ─────────────────────────────
+
+type AuthView = 'login' | 'forgot' | 'reset';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session, loading } = useAuth();
+  const [authView, setAuthView] = useState<AuthView>('login');
+
+  // Detecta o evento PASSWORD_RECOVERY que o supabase-js dispara automaticamente
+  // quando os tokens de recuperação são encontrados no fragment da URL.
+  // Isso acontece quando o usuário clica no link de redefinição do e-mail.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthView('reset');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (loading) {
     return (
@@ -76,7 +94,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  if (!session) return <LoginPage />;
+  // Redefinição de senha: exibida mesmo com sessão ativa
+  // (o Supabase cria uma sessão temporária durante o fluxo de recovery)
+  if (authView === 'reset') {
+    return <ResetPasswordPage onDone={() => setAuthView('login')} />;
+  }
+
+  if (!session) {
+    if (authView === 'forgot') {
+      return <ForgotPasswordPage onBack={() => setAuthView('login')} />;
+    }
+    return <LoginPage onForgotPassword={() => setAuthView('forgot')} />;
+  }
 
   return <>{children}</>;
 };
