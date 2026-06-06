@@ -57,16 +57,26 @@ const Sidebar: React.FC = () => {
         sidebarCollapsed ? 'w-20' : 'w-64'
       }`}
     >
-      <div className={`p-6 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+      <div className={`px-4 py-5 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {/* Logo expandido */}
         {!sidebarCollapsed && (
-          <h1 className="text-xl font-bold text-white flex items-center gap-2 animate-in fade-in duration-300">
-            <GraduationCap className="text-amber-400" />
-            CRM Formaturas
-          </h1>
+          <img
+            src="/assets/logo-top.png.png"
+            alt="TOP Formaturas"
+            className="h-10 w-auto object-contain animate-in fade-in duration-300"
+          />
         )}
-        <button 
+        {/* Logo colapsado — ícone quadrado */}
+        {sidebarCollapsed && (
+          <img
+            src="/assets/logo-top.png.png"
+            alt="TOP"
+            className="h-8 w-8 object-contain"
+          />
+        )}
+        <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-sm"
+          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-sm shrink-0"
         >
           {sidebarCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
         </button>

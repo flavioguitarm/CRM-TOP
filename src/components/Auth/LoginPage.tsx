@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 
 interface Props {
@@ -37,11 +37,12 @@ const LoginPage: React.FC<Props> = ({ onForgotPassword }) => {
 
         {/* Logo / branding */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-amber-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-400/20">
-            <GraduationCap size={40} className="text-amber-400" />
-          </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">CRM Formaturas</h1>
-          <p className="text-slate-400 text-sm mt-1">Gestão comercial inteligente</p>
+          <img
+            src="/assets/logo-top.png.png"
+            alt="TOP Formaturas"
+            className="h-24 w-auto object-contain mx-auto mb-5 drop-shadow-2xl"
+          />
+          <p className="text-slate-400 text-sm">Gestão comercial inteligente</p>
         </div>
 
         {/* Formulário */}
