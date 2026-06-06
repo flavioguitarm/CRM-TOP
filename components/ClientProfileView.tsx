@@ -95,11 +95,29 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
       name: p.name,
       customPrice: 0,
       goalQuantity: 0,
+      saleLimit: 'MULTIPLO' as const,
     }));
   }, [clientClass, products]);
 
   const clientSales = useMemo(() => sales.filter(s => s.clientId === client.id), [sales, client.id]);
   const clientNegotiations = useMemo(() => negotiations.filter(n => n.clientId === client.id), [negotiations, client.id]);
+
+  // IDs de produtos com limite ÚNICO que este cliente já possui (neg ativa ou venda)
+  const uniqueLimitProductsOwned = useMemo(() => {
+    const ownedProductIds = new Set<string>();
+    // Conta negociações não perdidas
+    clientNegotiations
+      .filter(n => n.status !== 'PERDIDO')
+      .forEach(n => ownedProductIds.add(n.productId));
+    // Conta vendas diretas
+    clientSales.forEach(s => ownedProductIds.add(s.productId));
+    // Filtra apenas os que têm saleLimit === 'UNICO'
+    return new Set(
+      allowedClassProducts
+        .filter(cp => cp.saleLimit === 'UNICO' && ownedProductIds.has(cp.productId))
+        .map(cp => cp.productId)
+    );
+  }, [clientNegotiations, clientSales, allowedClassProducts]);
   const clientTasks = useMemo(() => tasks.filter(t => t.clientId === client.id).sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), [tasks, client.id]);
 
   const handleAddActivity = (e: React.FormEvent) => {
@@ -157,6 +175,10 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
 
   const handleStartNegotiation = () => {
     if (!selectedProductId || !customPrice || !quantity) return;
+
+    // Bloqueia produto ÚNICO já adquirido
+    if (uniqueLimitProductsOwned.has(selectedProductId)) return;
+
     const prod = products.find(p => p.id === selectedProductId);
     const value = parseFloat(customPrice);
     const qty = parseInt(quantity) || 1;
@@ -391,25 +413,88 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
             })}
           </div>
 
-          {!isVisualizador && (
-            <div className="p-8 bg-white rounded-[3rem] border border-slate-200 shadow-sm space-y-4">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Registrar Interesse Comercial</p>
-              <select className="w-full p-4 text-xs border border-slate-200 rounded-2xl bg-white font-bold shadow-inner outline-none focus:ring-2 focus:ring-amber-500" value={selectedProductId} onChange={e => { setSelectedProductId(e.target.value); const item = allowedClassProducts.find(cp => cp.productId === e.target.value); if (item) setCustomPrice(item.customPrice.toString()); }}>
-                <option value="">Escolher Produto...</option>
-                {allowedClassProducts.map(p => <option key={p.productId} value={p.productId}>{p.name}</option>)}
-              </select>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 relative">
-                   <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input type="number" placeholder="Preço" className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-2xl text-xs font-black shadow-inner bg-white outline-none focus:ring-2 focus:ring-amber-500" value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
+          {!isVisualizador && (() => {
+            const selectedCp = allowedClassProducts.find(cp => cp.productId === selectedProductId);
+            const isUnicoBlocked = selectedProductId !== '' && uniqueLimitProductsOwned.has(selectedProductId);
+            const isUnicoSelected = selectedCp?.saleLimit === 'UNICO';
+
+            return (
+              <div className="p-8 bg-white rounded-[3rem] border border-slate-200 shadow-sm space-y-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Registrar Interesse Comercial</p>
+
+                <select
+                  className="w-full p-4 text-xs border border-slate-200 rounded-2xl bg-white font-bold shadow-inner outline-none focus:ring-2 focus:ring-amber-500"
+                  value={selectedProductId}
+                  onChange={e => {
+                    setSelectedProductId(e.target.value);
+                    const item = allowedClassProducts.find(cp => cp.productId === e.target.value);
+                    if (item) setCustomPrice(item.customPrice.toString());
+                    setQuantity('1');
+                  }}
+                >
+                  <option value="">Escolher Produto...</option>
+                  {allowedClassProducts.map(p => {
+                    const blocked = uniqueLimitProductsOwned.has(p.productId);
+                    return (
+                      <option key={p.productId} value={p.productId} disabled={blocked}>
+                        {p.name}{p.saleLimit === 'UNICO' ? ' · ① Único' : ''}
+                        {blocked ? ' — já adquirido' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                {/* Badge de limite do produto selecionado */}
+                {selectedProductId && (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                    isUnicoSelected
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    <span>{isUnicoSelected ? '①' : '∞'}</span>
+                    {isUnicoSelected ? 'Produto com limite único por aluno' : 'Produto sem limite de unidades'}
+                  </div>
+                )}
+
+                {/* Mensagem de bloqueio */}
+                {isUnicoBlocked && (
+                  <div className="flex items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <span className="text-rose-500 mt-0.5 shrink-0 text-base">⊘</span>
+                    <p className="text-[10px] font-black text-rose-700 uppercase leading-relaxed">
+                      Este produto já foi adquirido por este cliente e possui limite de 1 unidade.
+                    </p>
+                  </div>
+                )}
+
+                <div className={`grid grid-cols-3 gap-3 transition-opacity ${isUnicoBlocked ? 'opacity-30 pointer-events-none' : ''}`}>
+                  <div className="col-span-2 relative">
+                    <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="number" placeholder="Preço" className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-2xl text-xs font-black shadow-inner bg-white outline-none focus:ring-2 focus:ring-amber-500" value={customPrice} onChange={e => setCustomPrice(e.target.value)} />
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    max={isUnicoSelected ? 1 : undefined}
+                    placeholder="Qtd"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs font-black shadow-inner bg-white outline-none focus:ring-2 focus:ring-amber-500 text-center"
+                    value={quantity}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 1;
+                      setQuantity(isUnicoSelected ? '1' : String(val));
+                    }}
+                  />
                 </div>
-                <input type="number" min="1" placeholder="Qtd" className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-xs font-black shadow-inner bg-white outline-none focus:ring-2 focus:ring-amber-500 text-center" value={quantity} onChange={e => setQuantity(e.target.value)} />
+
+                <button
+                  onClick={handleStartNegotiation}
+                  disabled={!selectedProductId || !customPrice || isUnicoBlocked}
+                  className="w-full bg-slate-900 text-white py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-30 flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+                >
+                  <Plus size={16} /> Adicionar à Lista de Desejos
+                </button>
               </div>
-              <button onClick={handleStartNegotiation} disabled={!selectedProductId} className="w-full bg-slate-900 text-white py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-30 flex items-center justify-center gap-2 shadow-lg shadow-slate-200">
-                <Plus size={16} /> Adicionar à Lista de Desejos
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </section>
 
         {/* Histórico de Atividades */}

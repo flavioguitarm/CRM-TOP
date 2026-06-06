@@ -138,7 +138,8 @@ const ClassProductModal: React.FC<{
       goalQuantity: 0,
       goalValue: 0,
       erpQuantity: 0,
-      erpValue: 0
+      erpValue: 0,
+      saleLimit: 'MULTIPLO' as const,
     };
   });
 
@@ -178,6 +179,49 @@ const ClassProductModal: React.FC<{
               <option value="">Selecionar...</option>
               {availableProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+          </div>
+
+          {/* Limite de Vendas */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+              Limite de Vendas por Aluno
+              <HelpTooltip
+                text="ÚNICO: o aluno só pode comprar 1 unidade deste produto (ex: Adesão, Seguro Formatura). MÚLTIPLO: sem limite de unidades por aluno (ex: Convites extras, Mesas extras)."
+                position="right"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, saleLimit: 'UNICO' }))}
+                className={`flex flex-col items-center gap-1.5 py-4 px-3 rounded-2xl border-2 font-black text-xs uppercase tracking-widest transition-all ${
+                  formData.saleLimit === 'UNICO'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200'
+                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400'
+                }`}
+              >
+                <span className="text-lg leading-none">①</span>
+                Único
+                <span className={`text-[8px] font-bold normal-case tracking-normal leading-tight text-center ${formData.saleLimit === 'UNICO' ? 'text-slate-300' : 'text-slate-300'}`}>
+                  Max. 1 unidade por aluno
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, saleLimit: 'MULTIPLO' }))}
+                className={`flex flex-col items-center gap-1.5 py-4 px-3 rounded-2xl border-2 font-black text-xs uppercase tracking-widest transition-all ${
+                  formData.saleLimit === 'MULTIPLO'
+                    ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
+                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400'
+                }`}
+              >
+                <span className="text-lg leading-none">∞</span>
+                Múltiplo
+                <span className="text-[8px] font-bold normal-case tracking-normal leading-tight text-center text-current opacity-70">
+                  Sem limite por aluno
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -593,7 +637,16 @@ const TurmasAdmin: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <div className="p-2.5 bg-slate-50 rounded-2xl text-slate-400"><Tag size={20}/></div>
                           <div>
-                            <p className="text-sm font-black text-slate-900 uppercase">{baseProd?.name || 'Produto Removido'}</p>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="text-sm font-black text-slate-900 uppercase">{baseProd?.name || 'Produto Removido'}</p>
+                              <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${
+                                cp.saleLimit === 'UNICO'
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                                {cp.saleLimit === 'UNICO' ? '① Único' : '∞ Múltiplo'}
+                              </span>
+                            </div>
                             <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Tabela Turma: R$ {cp.customPrice.toLocaleString()}</p>
                           </div>
                         </div>

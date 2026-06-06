@@ -48,6 +48,8 @@ export interface Product {
   createdAt: string;
 }
 
+export type SaleLimit = 'UNICO' | 'MULTIPLO';
+
 export interface ClassProduct {
   id?: string;
   productId: string;
@@ -56,6 +58,7 @@ export interface ClassProduct {
   goalValue: number;
   erpQuantity?: number;
   erpValue?: number;
+  saleLimit: SaleLimit;
 }
 
 export interface ClassRoom {
