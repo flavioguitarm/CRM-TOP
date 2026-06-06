@@ -87,7 +87,7 @@ const FunnelConfig: React.FC = () => {
   const handleAddStage = () => {
     if (!selectedFunnel) return;
     const newStage: FunnelStage = {
-      id: `s-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: 'Nova Etapa',
       order: selectedFunnel.stages.length,
       type: 'NORMAL',
@@ -127,6 +127,28 @@ const FunnelConfig: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {isAddingFunnel && (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 animate-in fade-in duration-300">
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-6">Novo Funil</h2>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!newFunnelName.trim()) return;
+            addFunnel({ id: crypto.randomUUID(), name: newFunnelName.trim(), stages: [], responsibleUserIds: [] });
+            setNewFunnelName('');
+            setIsAddingFunnel(false);
+          }} className="flex gap-3">
+            <input
+              autoFocus
+              value={newFunnelName}
+              onChange={(e) => setNewFunnelName(e.target.value)}
+              placeholder="Nome do funil"
+              className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <button type="submit" className="bg-amber-500 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-amber-600 transition-colors">Criar</button>
+            <button type="button" onClick={() => { setIsAddingFunnel(false); setNewFunnelName(''); }} className="bg-slate-100 text-slate-600 px-5 py-2 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors">Cancelar</button>
+          </form>
+        </div>
+      )}
       {!selectedFunnel ? (
         <GenericRegistry
           title="Configuração de Funis"

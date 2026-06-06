@@ -1326,7 +1326,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addClass = async (newClass: ClassRoom) => {
     if (!tenantId) return;
-    const classId = newClass.id || `t-${Date.now()}`;
+    const classId = newClass.id || crypto.randomUUID();
     const { data: row, error } = await supabase
       .from('classes')
       .insert({

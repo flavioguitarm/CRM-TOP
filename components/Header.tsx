@@ -165,10 +165,10 @@ const Header: React.FC = () => {
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Acesso do Usuário</p>
               </div>
               
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 transition-colors">
+              <Link to="/perfil" onClick={() => setIsDropdownOpen(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 transition-colors">
                 <User size={18} className="text-slate-400" />
                 Minhas Informações
-              </button>
+              </Link>
               
               <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 transition-colors">
                 <Shield size={18} className="text-slate-400" />

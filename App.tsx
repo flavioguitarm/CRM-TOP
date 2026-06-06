@@ -26,6 +26,7 @@ import TrashPage from './pages/Admin/Trash';
 import DatabaseAdmin from './pages/Admin/Database';
 import BackupPage from './pages/Admin/Backup';
 import AgendaView from './pages/Agenda';
+import UserProfile from './pages/UserProfile';
 
 // ─── Sincroniza sessão Supabase → currentUser do store ───────────────────────
 
@@ -157,6 +158,7 @@ const AppRoutes: React.FC = () => (
     <Route path="/admin/backup"          element={<BackupPage />} />
     <Route path="/admin/lixeira"         element={<TrashPage />} />
     <Route path="/admin/*"               element={<Navigate to="/" replace />} />
+    <Route path="/perfil"                element={<UserProfile />} />
   </Routes>
 );
 

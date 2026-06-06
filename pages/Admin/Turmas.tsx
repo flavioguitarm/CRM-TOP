@@ -305,7 +305,7 @@ const TurmasAdmin: React.FC = () => {
 
   const handleSaveClass = (data: Partial<ClassRoom>) => {
     if (classToEdit) updateClass({ ...classToEdit, ...data } as ClassRoom);
-    else addClass({ ...data, id: `t-${Date.now()}`, timeline: [], classProducts: [] } as ClassRoom);
+    else addClass({ ...data, id: crypto.randomUUID(), timeline: [], classProducts: [] } as ClassRoom);
     setIsModalOpen(false);
   };
 
@@ -339,7 +339,7 @@ const TurmasAdmin: React.FC = () => {
     data.forEach(item => {
       addClass({
         ...item,
-        id: `t-${Date.now()}-${Math.random()}`,
+        id: crypto.randomUUID(),
         graduationYear: parseInt(item.graduationYear) || new Date().getFullYear(),
         graduationMonth: parseInt(item.graduationMonth) || 12,
         courseIds: item.courseIds ? item.courseIds.split(',') : [],
