@@ -7,6 +7,7 @@ import {
 import { Client, UserRole, ClassRoom, Campus, Sale, ProductNegotiation } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
 import BulkImportModal from '../components/BulkImportModal';
+import ConfirmModal from '../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 // --- Modal de Seleção de Turmas para Exportação ---
@@ -303,6 +304,7 @@ const ClientsView: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -313,10 +315,8 @@ const ClientsView: React.FC = () => {
   );
   const handleBulkDelete = () => {
     if (!selectedIds.size) return;
-    if (!confirm(`Mover ${selectedIds.size} cliente(s) para a Lixeira?`)) return;
-    if (selectedIds.has(selectedClientId || '')) setSelectedClientId(null);
-    moveToTrash('client', [...selectedIds]);
-    setSelectedIds(new Set());
+    const ids = [...selectedIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} cliente(s) para a Lixeira?`, onConfirm: () => { if (selectedIds.has(selectedClientId || '')) setSelectedClientId(null); moveToTrash('client', ids); setSelectedIds(new Set()); setConfirmConfig(null); } });
   };
 
   const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
@@ -581,7 +581,7 @@ const ClientsView: React.FC = () => {
                     <td className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button onClick={(e) => { e.stopPropagation(); setClientToEdit(client); setIsModalOpen(true); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Editar"><MoreHorizontal size={20} className="text-slate-400 hover:text-amber-500"/></button>
-                        <button onClick={(e) => { e.stopPropagation(); if (selectedClientId === client.id) setSelectedClientId(null); moveToTrash('client', [client.id]); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Mover para Lixeira"><Trash2 size={18} className="text-slate-400 hover:text-rose-500"/></button>
+                        <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${client.name}" para a Lixeira?`, onConfirm: () => { if (selectedClientId === client.id) setSelectedClientId(null); moveToTrash('client', [client.id]); setConfirmConfig(null); } }); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Mover para Lixeira"><Trash2 size={18} className="text-slate-400 hover:text-rose-500"/></button>
                       </div>
                     </td>
                   </tr>
@@ -637,11 +637,21 @@ const ClientsView: React.FC = () => {
       )}
 
       {isExportModalOpen && (
-          <ExportSelectionModal 
+          <ExportSelectionModal
             classes={classes}
             onClose={() => setIsExportModalOpen(false)}
             onConfirm={handleExportProcess}
           />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
       )}
     </div>
   );

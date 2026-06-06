@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { UserRole, Client, Activity, Task, Campus, FunnelStage } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
+import ConfirmModal from '../components/ConfirmModal';
 
 // --- Componente de Select com Busca para o Modal ---
 const SearchableSelect: React.FC<{ 
@@ -430,6 +431,7 @@ const FunnelView: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
   const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const currentFunnel = funnels.find(f => f.id === selectedFunnelId);
   const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
@@ -490,7 +492,7 @@ const FunnelView: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           {selectedDealIds.size > 0 && !isVisualizador && (
-             <button onClick={() => { if(confirm('Excluir selecionados?')) moveToTrash('client', Array.from(selectedDealIds)); setSelectedDealIds(new Set()); }} className="flex items-center gap-2 bg-rose-500 px-6 py-3 rounded-2xl text-white hover:bg-rose-600 transition-all font-black text-xs uppercase tracking-widest shadow-xl">
+             <button onClick={() => { const ids = Array.from(selectedDealIds); setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} negociação(ões) para a Lixeira?`, onConfirm: () => { moveToTrash('client', ids); setSelectedDealIds(new Set()); setConfirmConfig(null); } }); }} className="flex items-center gap-2 bg-rose-500 px-6 py-3 rounded-2xl text-white hover:bg-rose-600 transition-all font-black text-xs uppercase tracking-widest shadow-xl">
                 <Trash2 size={18} /> Excluir ({selectedDealIds.size})
              </button>
           )}
@@ -620,6 +622,16 @@ const FunnelView: React.FC = () => {
              <div className="flex-1 overflow-y-auto"><ClientProfileView clientId={selectedClientId} /></div>
           </div>
         </div>
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
       )}
     </div>
   );

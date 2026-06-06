@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { CSAction, CSActionActivity } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
+import ConfirmModal from '../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 const CSActionModal: React.FC<{
@@ -228,6 +229,7 @@ const CSActionsView: React.FC = () => {
   const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users } = useData();
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [actionToEdit, setActionToEdit] = useState<CSAction | null>(null);
@@ -252,11 +254,8 @@ const CSActionsView: React.FC = () => {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Deseja mover ${selectedIds.size} ações do CS para a lixeira?`)) {
-      moveToTrash('csAction', Array.from(selectedIds));
-      setSelectedIds(new Set());
-      setSelectedActionId(null);
-    }
+    const ids = Array.from(selectedIds);
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} ação(ões) do CS para a Lixeira?`, onConfirm: () => { moveToTrash('csAction', ids); setSelectedIds(new Set()); setSelectedActionId(null); setConfirmConfig(null); } });
   };
 
   const handleAddActivity = (e: React.FormEvent) => {
@@ -478,7 +477,7 @@ const CSActionsView: React.FC = () => {
 
              <div className="pt-6 border-t border-slate-100">
                  <button 
-                    onClick={() => { if(confirm('Mover para lixeira?')) { moveToTrash('csAction', [selectedAction.id]); setSelectedActionId(null); } }}
+                    onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a ação "${selectedAction.title}" para a Lixeira?`, onConfirm: () => { moveToTrash('csAction', [selectedAction.id]); setSelectedActionId(null); setConfirmConfig(null); } })}
                     className="w-full py-5 border-2 border-rose-100 text-rose-500 rounded-3xl font-black uppercase tracking-widest hover:bg-rose-50 flex items-center justify-center gap-3"
                  >
                     <Trash2 size={18}/> Excluir Ação
@@ -490,11 +489,21 @@ const CSActionsView: React.FC = () => {
 
       {isModalOpen && <CSActionModal actionToEdit={actionToEdit} onClose={() => setIsModalOpen(false)} />}
       {isImportModalOpen && (
-        <BulkImportModal 
-          title="Ações CS" 
-          fields={importFields} 
-          onClose={() => setIsImportModalOpen(false)} 
-          onImport={handleBulkImport} 
+        <BulkImportModal
+          title="Ações CS"
+          fields={importFields}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleBulkImport}
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import { useData } from '../../store';
 import { Product, ProductCategory } from '../../types';
 import { Package, Edit3, Trash2, X, Plus, ShoppingCart, Tag, FileSpreadsheet, Calendar, Download, Layers, Check, PlusCircle, CheckSquare, Square } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 const CategoryModal: React.FC<{
@@ -99,6 +100,7 @@ const ProdutosAdmin: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<any>(null);
   const [selectedProdIds, setSelectedProdIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [selectedCatIds, setSelectedCatIds] = useState<Set<string>>(new Set());
 
   const toggleSelectProd = (id: string, e: React.MouseEvent) => {
@@ -116,16 +118,13 @@ const ProdutosAdmin: React.FC = () => {
   );
   const handleBulkDeleteProds = () => {
     if (!selectedProdIds.size) return;
-    if (!confirm(`Mover ${selectedProdIds.size} produto(s) para a Lixeira?`)) return;
-    moveToTrash('product', [...selectedProdIds]);
-    setSelectedProdIds(new Set());
-    setSelectedProdId(null);
+    const ids = [...selectedProdIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} produto(s) para a Lixeira?`, onConfirm: () => { moveToTrash('product', ids); setSelectedProdIds(new Set()); setSelectedProdId(null); setConfirmConfig(null); } });
   };
   const handleBulkDeleteCats = () => {
     if (!selectedCatIds.size) return;
-    if (!confirm(`Mover ${selectedCatIds.size} categoria(s) para a Lixeira?`)) return;
-    moveToTrash('productCategory', [...selectedCatIds]);
-    setSelectedCatIds(new Set());
+    const ids = [...selectedCatIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} categoria(s) para a Lixeira?`, onConfirm: () => { moveToTrash('productCategory', ids); setSelectedCatIds(new Set()); setConfirmConfig(null); } });
   };
 
   const sortedProducts = useMemo(() => {
@@ -242,7 +241,7 @@ const ProdutosAdmin: React.FC = () => {
                      
                      <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2">
                        <button onClick={(e) => { e.stopPropagation(); setItemToEdit(prod); setProdModalOpen(true); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Edit3 size={16} /></button>
-                       <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) deleteProduct(prod.id); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
+                       <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${prod.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('product', [prod.id]); setConfirmConfig(null); } }); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
                      </div>
                    </div>
                  );
@@ -291,7 +290,7 @@ const ProdutosAdmin: React.FC = () => {
                         <td className="px-8 py-5 text-right">
                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button onClick={() => { setItemToEdit(cat); setCatModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all"><Edit3 size={18}/></button>
-                              <button onClick={() => { if(confirm('Excluir categoria?')) moveToTrash('productCategory', [cat.id]); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18}/></button>
+                              <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a categoria "${cat.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('productCategory', [cat.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18}/></button>
                            </div>
                         </td>
                       </tr>
@@ -379,6 +378,16 @@ const ProdutosAdmin: React.FC = () => {
           ]} 
           onClose={() => setIsImportModalOpen(false)} 
           onImport={handleBulkImport} 
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>

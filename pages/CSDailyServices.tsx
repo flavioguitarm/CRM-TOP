@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { CSDailyService, UserRole, Client } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
+import ConfirmModal from '../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 const ServiceModal: React.FC<{
@@ -192,6 +193,7 @@ const CSDailyServicesView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<CSDailyService | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -201,9 +203,8 @@ const CSDailyServicesView: React.FC = () => {
   );
   const handleBulkDelete = () => {
     if (!selectedIds.size) return;
-    if (!confirm(`Mover ${selectedIds.size} atendimento(s) para a Lixeira?`)) return;
-    moveToTrash('csDailyService', [...selectedIds]);
-    setSelectedIds(new Set());
+    const ids = [...selectedIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} atendimento(s) para a Lixeira?`, onConfirm: () => { moveToTrash('csDailyService', ids); setSelectedIds(new Set()); setConfirmConfig(null); } });
   };
 
   const filteredServices = useMemo(() => {
@@ -343,7 +344,7 @@ const CSDailyServicesView: React.FC = () => {
                     <td className="px-8 py-5 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                           <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm"><Edit3 size={18}/></button>
-                          <button onClick={() => moveToTrash('csDailyService', [service.id])} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>
+                          <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [service.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>
                        </div>
                     </td>
                   </tr>
@@ -375,6 +376,16 @@ const CSDailyServicesView: React.FC = () => {
       )}
 
       {isModalOpen && <ServiceModal serviceToEdit={serviceToEdit} onClose={() => setIsModalOpen(false)} />}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
+      )}
     </div>
   );
 };

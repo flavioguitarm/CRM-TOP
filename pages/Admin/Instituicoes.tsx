@@ -4,6 +4,7 @@ import { useData } from '../../store';
 import { Institution, Campus } from '../../types';
 import { Building2, MapPin, Layers, X, Check, MapPinned, Edit3, Trash2, GraduationCap, Plus, FileSpreadsheet, PlusCircle, Calendar, Download, CheckSquare, Square } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 const InstitutionModal: React.FC<{
@@ -116,6 +117,7 @@ const InstituicoesAdmin: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [instToEdit, setInstToEdit] = useState<Institution | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -126,10 +128,12 @@ const InstituicoesAdmin: React.FC = () => {
   );
   const handleBulkDelete = () => {
     if (!selectedIds.size) return;
-    if (!confirm(`Mover ${selectedIds.size} instituição(ões) para a Lixeira?`)) return;
-    moveToTrash('institution', [...selectedIds]);
-    setSelectedIds(new Set());
-    setSelectedInstId(null);
+    const ids = [...selectedIds];
+    setConfirmConfig({
+      title: 'Mover para Lixeira',
+      message: `Deseja mover ${ids.length} instituição(ões) para a Lixeira?`,
+      onConfirm: () => { moveToTrash('institution', ids); setSelectedIds(new Set()); setSelectedInstId(null); setConfirmConfig(null); },
+    });
   };
 
   const sortedInstitutions = useMemo(() => {
@@ -216,7 +220,7 @@ const InstituicoesAdmin: React.FC = () => {
               </div>
               <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); handleEdit(inst); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Edit3 size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); if(confirm('Mover para Lixeira?')) moveToTrash('institution', [inst.id]); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${inst.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('institution', [inst.id]); setConfirmConfig(null); } }); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
@@ -303,6 +307,16 @@ const InstituicoesAdmin: React.FC = () => {
             ]} 
             onClose={() => setIsImportModalOpen(false)} 
             onImport={handleBulkImport} 
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>

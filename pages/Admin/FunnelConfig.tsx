@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Funnel, FunnelStage, UserRole, FunnelStageType } from '../../types';
 import { GenericRegistry, Column } from '../../components/GenericRegistry';
+import ConfirmModal from '../../components/ConfirmModal';
 
 // Paleta simplificada de 256 cores (amostra representativa por segurança visual)
 const COLOR_PALETTE = [
@@ -62,6 +63,7 @@ const FunnelConfig: React.FC = () => {
   const [selectedFunnel, setSelectedFunnel] = useState<Funnel | null>(null);
   const [isAddingFunnel, setIsAddingFunnel] = useState(false);
   const [newFunnelName, setNewFunnelName] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
@@ -87,9 +89,17 @@ const FunnelConfig: React.FC = () => {
   const handleDeleteStage = (stageId: string) => {
     if (!selectedFunnel) return;
     if (isStageOccupied(stageId)) { alert('Esta etapa está em uso por um ou mais clientes e não pode ser removida.'); return; }
-    const updated = { ...selectedFunnel, stages: selectedFunnel.stages.filter(s => s.id !== stageId) };
-    updateFunnel(updated);
-    setSelectedFunnel(updated);
+    const stage = selectedFunnel.stages.find(s => s.id === stageId);
+    setConfirmConfig({
+      title: 'Remover Etapa',
+      message: `Deseja remover a etapa "${stage?.name || ''}" do funil?`,
+      onConfirm: () => {
+        const updated = { ...selectedFunnel, stages: selectedFunnel.stages.filter(s => s.id !== stageId) };
+        updateFunnel(updated);
+        setSelectedFunnel(updated);
+        setConfirmConfig(null);
+      },
+    });
   };
 
   const handleAddStage = () => {
@@ -203,6 +213,16 @@ const FunnelConfig: React.FC = () => {
               </div>
            </div>
         </div>
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Remover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import {
   User, Briefcase, Zap, CheckSquare, Square
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import { ClassRoom, ClassProduct } from '../../types';
 import * as XLSX from 'xlsx';
 
@@ -279,6 +280,7 @@ const TurmasAdmin: React.FC = () => {
   const [classToEdit, setClassToEdit] = useState<ClassRoom | null>(null);
   const [classProductModal, setClassProductModal] = useState<{ open: boolean, edit?: ClassProduct }>({ open: false });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -289,10 +291,12 @@ const TurmasAdmin: React.FC = () => {
   );
   const handleBulkDelete = () => {
     if (!selectedIds.size) return;
-    if (!confirm(`Mover ${selectedIds.size} turma(s) para a Lixeira?`)) return;
-    moveToTrash('class', [...selectedIds]);
-    setSelectedIds(new Set());
-    setSelectedClassId(null);
+    const ids = [...selectedIds];
+    setConfirmConfig({
+      title: 'Mover para Lixeira',
+      message: `Deseja mover ${ids.length} turma(s) para a Lixeira?`,
+      onConfirm: () => { moveToTrash('class', ids); setSelectedIds(new Set()); setSelectedClassId(null); setConfirmConfig(null); },
+    });
   };
 
   const sortedClasses = useMemo(() => {
@@ -451,7 +455,7 @@ const TurmasAdmin: React.FC = () => {
                     <td className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={(e) => { e.stopPropagation(); setClassToEdit(cls); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all"><Edit3 size={18} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Mover para Lixeira?')) moveToTrash('class', [cls.id]); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a turma "${cls.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('class', [cls.id]); setConfirmConfig(null); } }); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
                       </div>
                     </td>
                   </tr>
@@ -605,9 +609,7 @@ const TurmasAdmin: React.FC = () => {
                                 alert('Não é possível remover um produto que já possui vendas realizadas nesta turma.');
                                 return;
                               }
-                              if (confirm('Deseja remover este produto do catálogo da turma?')) {
-                                removeClassProduct(selectedClassId, cp.id || cp.productId);
-                              }
+                              setConfirmConfig({ title: 'Remover Produto', message: 'Deseja remover este produto do catálogo da turma?', onConfirm: () => { removeClassProduct(selectedClassId, cp.id || cp.productId); setConfirmConfig(null); } });
                             }}
                             className={`p-2 transition-colors ${realizedQty > 0 ? 'text-slate-100' : 'text-slate-300 hover:text-rose-500'}`}
                            >
@@ -750,11 +752,21 @@ const TurmasAdmin: React.FC = () => {
       )}
 
       {isImportModalOpen && (
-        <BulkImportModal 
-            title="Turmas" 
-            fields={importFields} 
-            onClose={() => setIsImportModalOpen(false)} 
-            onImport={handleBulkImport} 
+        <BulkImportModal
+            title="Turmas"
+            fields={importFields}
+            onClose={() => setIsImportModalOpen(false)}
+            onImport={handleBulkImport}
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Confirmar"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>

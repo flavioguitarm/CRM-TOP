@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useData } from '../store';
 import { 
   X, Check, User, Mail, Phone, GraduationCap, Building2, Clock3, 
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Activity, UserRole, Task, ProductNegotiation, Sale } from '../types';
 import * as XLSX from 'xlsx';
+import ConfirmModal from './ConfirmModal';
 
 interface Props {
   clientId: string;
@@ -69,6 +70,7 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
   const [customPrice, setCustomPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [newTask, setNewTask] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '09:00' });
+  const [pendingDeleteNeg, setPendingDeleteNeg] = useState<ProductNegotiation | null>(null);
 
   const client = clients.find(c => c.id === clientId);
   if (!client) return <div className="p-12 text-center text-slate-400">Lead não encontrado.</div>;
@@ -201,7 +203,13 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
 
   // Função de exclusão liberada com log automático
   const handleDeleteNegotiationWithLog = (neg: ProductNegotiation) => {
-    if (!confirm('Deseja excluir este registro? Se for uma venda já efetivada, o valor será estornado do financeiro do cliente.')) return;
+    setPendingDeleteNeg(neg);
+  };
+
+  const confirmDeleteNegotiation = () => {
+    const neg = pendingDeleteNeg;
+    if (!neg) return;
+    setPendingDeleteNeg(null);
     
     const prod = products.find(p => p.id === neg.productId);
     const activity: Activity = {
@@ -468,6 +476,16 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
           activities={client.activities} 
           onClose={() => setIsHistoryModalOpen(false)} 
           clientName={client.name} 
+        />
+      )}
+
+      {pendingDeleteNeg && (
+        <ConfirmModal
+          title="Excluir Registro"
+          message="Deseja excluir este registro? Se for uma venda já efetivada, o valor será estornado do financeiro do cliente."
+          confirmLabel="Sim, Excluir"
+          onConfirm={confirmDeleteNegotiation}
+          onCancel={() => setPendingDeleteNeg(null)}
         />
       )}
     </div>

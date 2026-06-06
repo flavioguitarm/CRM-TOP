@@ -10,6 +10,7 @@ import {
   PlusCircle, Layers, Square
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 const SearchableSelect: React.FC<{ 
@@ -205,6 +206,7 @@ const EventosAdmin: React.FC = () => {
   const [itemToEdit, setItemToEdit] = useState<any>(null);
   const [newActivityText, setNewActivityText] = useState('');
   const [selectedEvtIds, setSelectedEvtIds] = useState<Set<string>>(new Set());
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
 
   const toggleSelectEvt = (id: string, e: React.MouseEvent) => {
@@ -222,16 +224,13 @@ const EventosAdmin: React.FC = () => {
   );
   const handleBulkDeleteEvts = () => {
     if (!selectedEvtIds.size) return;
-    if (!confirm(`Mover ${selectedEvtIds.size} evento(s) para a Lixeira?`)) return;
-    moveToTrash('event', [...selectedEvtIds]);
-    setSelectedEvtIds(new Set());
-    setSelectedEvtId(null);
+    const ids = [...selectedEvtIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} evento(s) para a Lixeira?`, onConfirm: () => { moveToTrash('event', ids); setSelectedEvtIds(new Set()); setSelectedEvtId(null); setConfirmConfig(null); } });
   };
   const handleBulkDeleteTypes = () => {
     if (!selectedTypeIds.size) return;
-    if (!confirm(`Mover ${selectedTypeIds.size} tipo(s) para a Lixeira?`)) return;
-    moveToTrash('activityType', [...selectedTypeIds]);
-    setSelectedTypeIds(new Set());
+    const ids = [...selectedTypeIds];
+    setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} tipo(s) de atividade para a Lixeira?`, onConfirm: () => { moveToTrash('activityType', ids); setSelectedTypeIds(new Set()); setConfirmConfig(null); } });
   };
 
   useEffect(() => {
@@ -392,7 +391,7 @@ const EventosAdmin: React.FC = () => {
                      </div>
                      <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2 transition-all">
                        <button onClick={(e) => { e.stopPropagation(); setItemToEdit(evt); setModalOpen(true); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg hover:bg-amber-600"><Edit3 size={16} /></button>
-                       <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir este evento do cronograma?')) deleteEvent(evt.id); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg hover:bg-rose-600"><Trash2 size={16} /></button>
+                       <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover o evento "${evt.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('event', [evt.id]); setConfirmConfig(null); } }); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg hover:bg-rose-600"><Trash2 size={16} /></button>
                      </div>
                    </div>
                  );
@@ -433,7 +432,7 @@ const EventosAdmin: React.FC = () => {
                       <td className="px-8 py-5 text-right">
                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                             <button onClick={() => { setItemToEdit(type); setTypeModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all"><Edit3 size={18}/></button>
-                            <button onClick={() => { if(confirm('Excluir este tipo de atividade?')) moveToTrash('activityType', [type.id]); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18}/></button>
+                            <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover o tipo "${type.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('activityType', [type.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18}/></button>
                          </div>
                       </td>
                     </tr>
@@ -540,7 +539,7 @@ const EventosAdmin: React.FC = () => {
                   </div>
                </section>
 
-              <button onClick={() => { if(confirm('Deseja excluir este evento permanentemente?')) { deleteEvent(selectedEvt.id); handleCloseProfile(); } }} className="w-full py-4 border-2 border-rose-100 text-rose-500 rounded-2xl font-black uppercase tracking-widest hover:bg-rose-50 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover o evento "${selectedEvt.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('event', [selectedEvt.id]); handleCloseProfile(); setConfirmConfig(null); } })} className="w-full py-4 border-2 border-rose-100 text-rose-500 rounded-2xl font-black uppercase tracking-widest hover:bg-rose-50 transition-all flex items-center justify-center gap-2">
                 <Trash2 size={16}/> Excluir Registro
               </button>
             </div>
@@ -577,11 +576,21 @@ const EventosAdmin: React.FC = () => {
       {typeModalOpen && <ActivityTypeModal type={itemToEdit} onClose={() => setTypeModalOpen(false)} onSave={handleSaveType} />}
       
       {isImportModalOpen && (
-        <BulkImportModal 
-            title="Eventos" 
-            fields={importFields} 
-            onClose={() => setIsImportModalOpen(false)} 
-            onImport={handleBulkImport} 
+        <BulkImportModal
+            title="Eventos"
+            fields={importFields}
+            onClose={() => setIsImportModalOpen(false)}
+            onImport={handleBulkImport}
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel="Sim, Mover"
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>
