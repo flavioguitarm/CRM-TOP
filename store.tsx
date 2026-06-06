@@ -108,6 +108,7 @@ interface DataContextType {
   importDatabase: (jsonData: string) => void;
   exportAllData: () => Promise<string>;
   importAllData: (json: string) => Promise<void>;
+  resetAllData: () => Promise<void>;
 }
 
 const STORAGE_KEY = 'crm_top_formaturas_v1_prod_v3';
@@ -1940,6 +1941,53 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ── resetAllData: apaga TUDO do Supabase (ordem FK-safe) + localStorage ─────
+  const resetAllData = async (): Promise<void> => {
+    if (!tenantId) return;
+    const tid = tenantId;
+    const del = (table: string) =>
+      supabase.from(table).delete().eq('tenant_id', tid)
+        .then(({ error }) => { if (error) console.error(`resetAllData ${table}:`, error.message); });
+
+    // Folhas primeiro, raízes por último
+    await del('sales');
+    await del('product_negotiations');
+    await del('client_tasks');
+    await del('cs_daily_services');
+    await del('cs_action_activities');
+    await del('cs_actions');
+    await del('event_activities');
+    await del('events');
+    await del('client_activities');
+    await del('clients');
+    await del('class_timeline_events');
+    await del('class_products');
+    // class_courses não tem tenant_id — apaga via classes (cascade ou manualmente)
+    const classIds = classes.map(c => c.id);
+    if (classIds.length) {
+      await supabase.from('class_courses').delete().in('class_id', classIds)
+        .then(({ error }) => { if (error) console.error('resetAllData class_courses:', error.message); });
+    }
+    await del('classes');
+    // funnel_stages / funnel_responsible_users
+    const funnelIds = funnels.map(f => f.id);
+    if (funnelIds.length) {
+      await supabase.from('funnel_stages').delete().in('funnel_id', funnelIds)
+        .then(({ error }) => { if (error) console.error('resetAllData funnel_stages:', error.message); });
+      await supabase.from('funnel_responsible_users').delete().in('funnel_id', funnelIds)
+        .then(({ error }) => { if (error) console.error('resetAllData funnel_responsible_users:', error.message); });
+    }
+    await del('funnels');
+    await del('activity_types');
+    await del('users');
+    await del('products');
+    await del('product_categories');
+    await del('courses');
+    await del('institutions');
+
+    localStorage.clear();
+  };
+
   return (
     <DataContext.Provider value={{
       currentUser, setCurrentUser, sidebarCollapsed, setSidebarCollapsed,
@@ -1965,7 +2013,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addCSAction, updateCSAction, addCSActionActivity, deleteCSAction,
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
       resetDatabase, exportDatabase, importDatabase,
-      exportAllData, importAllData,
+      exportAllData, importAllData, resetAllData,
     }}>
       {children}
     </DataContext.Provider>

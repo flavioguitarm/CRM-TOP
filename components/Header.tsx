@@ -2,14 +2,50 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useData } from '../store';
 import { useAuth } from '../src/hooks/useAuth';
-import { LogOut, ChevronDown, User, Shield, Bell, Clock, Calendar, Zap, ListTodo, ChevronRight, CheckCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { supabase } from '../src/lib/supabase';
+import { LogOut, ChevronDown, User, Shield, Bell, Clock, Calendar, Zap, ListTodo, ChevronRight, CheckCircle, Eye, EyeOff, Loader2, X, AlertTriangle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Header: React.FC = () => {
   const { currentUser, sidebarCollapsed, tasks, events, classes } = useData();
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifyOpen, setIsNotifyOpen] = useState(false);
+
+  // ── Modal de confirmação de senha para acessar Segurança ──────────────────
+  const [secModalOpen, setSecModalOpen] = useState(false);
+  const [secPassword, setSecPassword] = useState('');
+  const [secShowPwd, setSecShowPwd] = useState(false);
+  const [secLoading, setSecLoading] = useState(false);
+  const [secError, setSecError] = useState<string | null>(null);
+
+  const handleOpenSecurity = () => {
+    setIsDropdownOpen(false);
+    setSecPassword('');
+    setSecError(null);
+    setSecShowPwd(false);
+    setSecModalOpen(true);
+  };
+
+  const handleSecuritySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser?.email || !secPassword) return;
+    setSecLoading(true);
+    setSecError(null);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: currentUser.email,
+      password: secPassword,
+    });
+    setSecLoading(false);
+    if (error) {
+      setSecError('Senha incorreta. Tente novamente.');
+      return;
+    }
+    setSecModalOpen(false);
+    setSecPassword('');
+    navigate('/admin/seguranca');
+  };
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifyRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +101,8 @@ const Header: React.FC = () => {
   if (!currentUser) return null;
 
   return (
-    <header 
+    <>
+    <header
       className={`fixed top-0 right-0 h-16 bg-slate-900 border-b border-slate-800 z-40 flex items-center justify-end px-8 shadow-lg transition-all duration-300 ${
         sidebarCollapsed ? 'left-20' : 'left-64'
       }`}
@@ -170,7 +207,7 @@ const Header: React.FC = () => {
                 Minhas Informações
               </Link>
               
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 transition-colors">
+              <button onClick={handleOpenSecurity} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 transition-colors">
                 <Shield size={18} className="text-slate-400" />
                 Segurança
               </button>
@@ -189,6 +226,63 @@ const Header: React.FC = () => {
         </div>
       </div>
     </header>
+
+    {/* ── Modal de senha para Segurança ──────────────────────────────────── */}
+    {secModalOpen && (
+      <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[500] flex items-center justify-center p-4" onClick={() => setSecModalOpen(false)}>
+        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center">
+                <Shield size={20} className="text-amber-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Segurança</h2>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Confirme sua senha para continuar</p>
+              </div>
+            </div>
+            <button onClick={() => setSecModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSecuritySubmit} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Senha da conta</label>
+              <div className="flex items-center border border-slate-200 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-amber-400 transition-all">
+                <input
+                  autoFocus
+                  type={secShowPwd ? 'text' : 'password'}
+                  value={secPassword}
+                  onChange={e => setSecPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="flex-1 bg-transparent text-sm font-semibold text-slate-800 focus:outline-none"
+                />
+                <button type="button" onClick={() => setSecShowPwd(v => !v)} className="text-slate-400 hover:text-slate-600 transition-colors ml-2">
+                  {secShowPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {secError && (
+              <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl p-3">
+                <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                <p className="text-xs font-bold text-rose-700">{secError}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={secLoading || !secPassword}
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2"
+            >
+              {secLoading ? <><Loader2 size={16} className="animate-spin" /> Verificando…</> : <><Shield size={16} /> Acessar Segurança</>}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 

@@ -18,10 +18,7 @@ import {
   ChevronLeft,
   Zap,
   Trash2,
-  ShieldCheck,
-  Tag,
   Headset,
-  HardDriveDownload,
 } from 'lucide-react';
 import { useData } from '../store';
 import { UserRole } from '../types';
@@ -51,8 +48,6 @@ const Sidebar: React.FC = () => {
     { path: '/admin/eventos', label: 'Eventos', icon: Calendar },
     { path: '/admin/usuarios', label: 'Usuários', icon: UserCircle2 },
     { path: '/admin/funis', label: 'Config. Funil', icon: Funnel },
-    { path: '/admin/seguranca', label: 'Segurança', icon: ShieldCheck },
-    { path: '/admin/backup',    label: 'Backup & Restore', icon: HardDriveDownload },
     { path: '/admin/lixeira',   label: 'Lixeira', icon: Trash2 },
   ];
 
