@@ -3,11 +3,11 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useData } from '../../store';
 import { Event, EventActivity, ActivityType } from '../../types';
-import { 
-  Calendar, Clock, Tag, MapPin, CheckCircle2, AlertCircle, X, Check, 
-  GraduationCap, Filter, Building2, Search, CheckSquare, Edit3, Trash2, 
+import {
+  Calendar, Clock, Tag, MapPin, CheckCircle2, AlertCircle, X, Check,
+  GraduationCap, Filter, Building2, Search, CheckSquare, Edit3, Trash2,
   Plus, Info, ChevronDown, FileSpreadsheet, Download, MessageSquare, Send,
-  PlusCircle, Layers
+  PlusCircle, Layers, Square
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import * as XLSX from 'xlsx';
@@ -204,6 +204,35 @@ const EventosAdmin: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<any>(null);
   const [newActivityText, setNewActivityText] = useState('');
+  const [selectedEvtIds, setSelectedEvtIds] = useState<Set<string>>(new Set());
+  const [selectedTypeIds, setSelectedTypeIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectEvt = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedEvtIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectType = (id: string) => {
+    setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAllEvts = () => setSelectedEvtIds(prev =>
+    prev.size === events.length ? new Set() : new Set(events.map(e => e.id))
+  );
+  const toggleSelectAllTypes = () => setSelectedTypeIds(prev =>
+    prev.size === activityTypes.length ? new Set() : new Set(activityTypes.map(t => t.id))
+  );
+  const handleBulkDeleteEvts = () => {
+    if (!selectedEvtIds.size) return;
+    if (!confirm(`Mover ${selectedEvtIds.size} evento(s) para a Lixeira?`)) return;
+    moveToTrash('event', [...selectedEvtIds]);
+    setSelectedEvtIds(new Set());
+    setSelectedEvtId(null);
+  };
+  const handleBulkDeleteTypes = () => {
+    if (!selectedTypeIds.size) return;
+    if (!confirm(`Mover ${selectedTypeIds.size} tipo(s) para a Lixeira?`)) return;
+    moveToTrash('activityType', [...selectedTypeIds]);
+    setSelectedTypeIds(new Set());
+  };
 
   useEffect(() => {
     const idFromUrl = searchParams.get('id');
@@ -334,11 +363,14 @@ const EventosAdmin: React.FC = () => {
                {events.map(evt => {
                  const cls = classes.find(c => c.id === evt.classId);
                  return (
-                   <div 
-                     key={evt.id} 
-                     onClick={() => setSelectedEvtId(evt.id)} 
-                     className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedEvtId === evt.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : 'border-white hover:border-slate-200 shadow-sm'}`}
+                   <div
+                     key={evt.id}
+                     onClick={() => setSelectedEvtId(evt.id)}
+                     className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedEvtId === evt.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedEvtIds.has(evt.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}
                    >
+                     <button onClick={(e) => toggleSelectEvt(evt.id, e)} className={`absolute top-3 left-3 p-1 rounded-lg transition-all z-10 ${selectedEvtIds.has(evt.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
+                       {selectedEvtIds.has(evt.id) ? <CheckSquare size={16}/> : <Square size={16}/>}
+                     </button>
                      <div className="flex items-center gap-2 mb-3">
                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase ${evt.status === 'Confirmado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                          {evt.status}
@@ -371,6 +403,11 @@ const EventosAdmin: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+                    <th className="px-4 py-5 w-12">
+                      <button onClick={toggleSelectAllTypes} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                        {selectedTypeIds.size === activityTypes.length && activityTypes.length > 0 ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16}/>}
+                      </button>
+                    </th>
                     <th className="px-8 py-5">Nome do Tipo de Atividade</th>
                     <th className="px-8 py-5">Identificador Interno</th>
                     <th className="px-8 py-5 text-right">Ações</th>
@@ -378,7 +415,12 @@ const EventosAdmin: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {activityTypes.map(type => (
-                    <tr key={type.id} className="hover:bg-slate-50 group transition-colors">
+                    <tr key={type.id} className={`hover:bg-slate-50 group transition-colors ${selectedTypeIds.has(type.id) ? 'bg-rose-50' : ''}`}>
+                      <td className="px-4 py-5">
+                        <button onClick={() => toggleSelectType(type.id)} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                          {selectedTypeIds.has(type.id) ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16} className="text-slate-300"/>}
+                        </button>
+                      </td>
                       <td className="px-8 py-5">
                         <div className="flex items-center gap-3">
                            <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600"><Tag size={16}/></div>
@@ -507,6 +549,31 @@ const EventosAdmin: React.FC = () => {
       </div>
 
       {modalOpen && <EventModal event={itemToEdit} onClose={() => setModalOpen(false)} onSave={(d) => { if(itemToEdit) updateEvent({...itemToEdit, ...d} as Event); else addEvent({...d, id: crypto.randomUUID()} as Event); setModalOpen(false); }} />}
+      {(selectedEvtIds.size > 0 || selectedTypeIds.size > 0) && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom duration-200">
+          {activeTab === 'events' && selectedEvtIds.size > 0 && (
+            <>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedEvtIds.size} evento{selectedEvtIds.size > 1 ? 's' : ''}</span>
+              <div className="w-px h-5 bg-slate-700" />
+              <button onClick={handleBulkDeleteEvts} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                <Trash2 size={14} /> Mover para Lixeira
+              </button>
+              <button onClick={() => setSelectedEvtIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"><X size={16} /></button>
+            </>
+          )}
+          {activeTab === 'types' && selectedTypeIds.size > 0 && (
+            <>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedTypeIds.size} tipo{selectedTypeIds.size > 1 ? 's' : ''}</span>
+              <div className="w-px h-5 bg-slate-700" />
+              <button onClick={handleBulkDeleteTypes} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                <Trash2 size={14} /> Mover para Lixeira
+              </button>
+              <button onClick={() => setSelectedTypeIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"><X size={16} /></button>
+            </>
+          )}
+        </div>
+      )}
+
       {typeModalOpen && <ActivityTypeModal type={itemToEdit} onClose={() => setTypeModalOpen(false)} onSave={handleSaveType} />}
       
       {isImportModalOpen && (

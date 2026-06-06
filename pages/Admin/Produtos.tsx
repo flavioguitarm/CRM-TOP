@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../store';
 import { Product, ProductCategory } from '../../types';
-import { Package, Edit3, Trash2, X, Plus, ShoppingCart, Tag, FileSpreadsheet, Calendar, Download, Layers, Check, PlusCircle } from 'lucide-react';
+import { Package, Edit3, Trash2, X, Plus, ShoppingCart, Tag, FileSpreadsheet, Calendar, Download, Layers, Check, PlusCircle, CheckSquare, Square } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import * as XLSX from 'xlsx';
 
@@ -98,6 +98,35 @@ const ProdutosAdmin: React.FC = () => {
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<any>(null);
+  const [selectedProdIds, setSelectedProdIds] = useState<Set<string>>(new Set());
+  const [selectedCatIds, setSelectedCatIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectProd = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedProdIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectCat = (id: string) => {
+    setSelectedCatIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAllProds = () => setSelectedProdIds(prev =>
+    prev.size === sortedProducts.length ? new Set() : new Set(sortedProducts.map(p => p.id))
+  );
+  const toggleSelectAllCats = () => setSelectedCatIds(prev =>
+    prev.size === productCategories.length ? new Set() : new Set(productCategories.map(c => c.id))
+  );
+  const handleBulkDeleteProds = () => {
+    if (!selectedProdIds.size) return;
+    if (!confirm(`Mover ${selectedProdIds.size} produto(s) para a Lixeira?`)) return;
+    moveToTrash('product', [...selectedProdIds]);
+    setSelectedProdIds(new Set());
+    setSelectedProdId(null);
+  };
+  const handleBulkDeleteCats = () => {
+    if (!selectedCatIds.size) return;
+    if (!confirm(`Mover ${selectedCatIds.size} categoria(s) para a Lixeira?`)) return;
+    moveToTrash('productCategory', [...selectedCatIds]);
+    setSelectedCatIds(new Set());
+  };
 
   const sortedProducts = useMemo(() => {
     return [...products].sort((a, b) => a.name.localeCompare(b.name));
@@ -194,11 +223,14 @@ const ProdutosAdmin: React.FC = () => {
                {sortedProducts.map(prod => {
                  const cat = productCategories.find(c => c.id === prod.categoryId);
                  return (
-                   <div 
-                     key={prod.id} 
-                     onClick={() => setSelectedProdId(prod.id)} 
-                     className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedProdId === prod.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : 'border-white hover:border-slate-200 shadow-sm'}`}
+                   <div
+                     key={prod.id}
+                     onClick={() => setSelectedProdId(prod.id)}
+                     className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedProdId === prod.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedProdIds.has(prod.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}
                    >
+                     <button onClick={(e) => toggleSelectProd(prod.id, e)} className={`absolute top-3 left-3 p-1 rounded-lg transition-all z-10 ${selectedProdIds.has(prod.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
+                       {selectedProdIds.has(prod.id) ? <CheckSquare size={16}/> : <Square size={16}/>}
+                     </button>
                      <div className="flex justify-between items-start mb-4">
                        <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><ShoppingCart size={24}/></div>
                        <span className="text-[9px] font-black px-2 py-1 rounded-lg border uppercase bg-blue-50 text-blue-600 border-blue-100">
@@ -227,6 +259,11 @@ const ProdutosAdmin: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+                    <th className="px-4 py-5 w-12">
+                      <button onClick={toggleSelectAllCats} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                        {selectedCatIds.size === productCategories.length && productCategories.length > 0 ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16}/>}
+                      </button>
+                    </th>
                     <th className="px-8 py-5">Nome da Categoria</th>
                     <th className="px-8 py-5">Itens Vinculados</th>
                     <th className="px-8 py-5 text-right">Ações</th>
@@ -236,7 +273,12 @@ const ProdutosAdmin: React.FC = () => {
                   {productCategories.map(cat => {
                     const linkedCount = products.filter(p => p.categoryId === cat.id).length;
                     return (
-                      <tr key={cat.id} className="hover:bg-slate-50 group">
+                      <tr key={cat.id} className={`hover:bg-slate-50 group ${selectedCatIds.has(cat.id) ? 'bg-rose-50' : ''}`}>
+                        <td className="px-4 py-5">
+                          <button onClick={() => toggleSelectCat(cat.id)} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                            {selectedCatIds.has(cat.id) ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16} className="text-slate-300"/>}
+                          </button>
+                        </td>
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
                              <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600"><Layers size={16}/></div>
@@ -299,6 +341,31 @@ const ProdutosAdmin: React.FC = () => {
           </div>
         )}
       </div>
+
+      {(selectedProdIds.size > 0 || selectedCatIds.size > 0) && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom duration-200">
+          {activeTab === 'products' && selectedProdIds.size > 0 && (
+            <>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedProdIds.size} produto{selectedProdIds.size > 1 ? 's' : ''}</span>
+              <div className="w-px h-5 bg-slate-700" />
+              <button onClick={handleBulkDeleteProds} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                <Trash2 size={14} /> Mover para Lixeira
+              </button>
+              <button onClick={() => setSelectedProdIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"><X size={16} /></button>
+            </>
+          )}
+          {activeTab === 'categories' && selectedCatIds.size > 0 && (
+            <>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedCatIds.size} categoria{selectedCatIds.size > 1 ? 's' : ''}</span>
+              <div className="w-px h-5 bg-slate-700" />
+              <button onClick={handleBulkDeleteCats} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                <Trash2 size={14} /> Mover para Lixeira
+              </button>
+              <button onClick={() => setSelectedCatIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"><X size={16} /></button>
+            </>
+          )}
+        </div>
+      )}
 
       {prodModalOpen && <ProductModal product={itemToEdit} onClose={() => setProdModalOpen(false)} onSave={handleSaveProduct} />}
       {catModalOpen && <CategoryModal category={itemToEdit} onClose={() => setCatModalOpen(false)} onSave={handleSaveCategory} />}

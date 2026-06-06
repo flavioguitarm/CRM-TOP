@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../store';
 import { Institution, Campus } from '../../types';
-import { Building2, MapPin, Layers, X, Check, MapPinned, Edit3, Trash2, GraduationCap, Plus, FileSpreadsheet, PlusCircle, Calendar, Download } from 'lucide-react';
+import { Building2, MapPin, Layers, X, Check, MapPinned, Edit3, Trash2, GraduationCap, Plus, FileSpreadsheet, PlusCircle, Calendar, Download, CheckSquare, Square } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import * as XLSX from 'xlsx';
 
@@ -110,11 +110,27 @@ const InstitutionModal: React.FC<{
 };
 
 const InstituicoesAdmin: React.FC = () => {
-  const { institutions, addInstitution, updateInstitution, deleteInstitution, classes } = useData();
+  const { institutions, addInstitution, updateInstitution, moveToTrash, classes } = useData();
   const [selectedInstId, setSelectedInstId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [instToEdit, setInstToEdit] = useState<Institution | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAll = () => setSelectedIds(prev =>
+    prev.size === sortedInstitutions.length ? new Set() : new Set(sortedInstitutions.map(i => i.id))
+  );
+  const handleBulkDelete = () => {
+    if (!selectedIds.size) return;
+    if (!confirm(`Mover ${selectedIds.size} instituição(ões) para a Lixeira?`)) return;
+    moveToTrash('institution', [...selectedIds]);
+    setSelectedIds(new Set());
+    setSelectedInstId(null);
+  };
 
   const sortedInstitutions = useMemo(() => {
     return [...institutions].sort((a, b) => a.name.localeCompare(b.name));
@@ -172,6 +188,9 @@ const InstituicoesAdmin: React.FC = () => {
         <div className="flex items-center justify-between">
           <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Instituições</h1><p className="text-slate-500 font-medium">Controle o cadastro de parceiros acadêmicos e seus campi.</p></div>
           <div className="flex items-center gap-3">
+             <button onClick={toggleSelectAll} className="bg-slate-100 text-slate-600 px-4 py-3 rounded-2xl font-black text-xs uppercase border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
+               {selectedIds.size === sortedInstitutions.length && sortedInstitutions.length > 0 ? <CheckSquare size={16}/> : <Square size={16}/>} Selecionar tudo
+             </button>
              <button onClick={handleExportXLS} className="bg-slate-100 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
                 <Download size={18} /> Exportar XLS Detalhado
              </button>
@@ -183,7 +202,10 @@ const InstituicoesAdmin: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-auto">
           {sortedInstitutions.map(inst => (
-            <div key={inst.id} onClick={() => setSelectedInstId(inst.id)} className={`p-6 rounded-[2.5rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedInstId === inst.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : 'border-white hover:border-slate-200 shadow-sm'}`}>
+            <div key={inst.id} onClick={() => setSelectedInstId(inst.id)} className={`p-6 rounded-[2.5rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedInstId === inst.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedIds.has(inst.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}>
+              <button onClick={(e) => toggleSelect(inst.id, e)} className={`absolute top-4 left-4 p-1 rounded-lg transition-all ${selectedIds.has(inst.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
+                {selectedIds.has(inst.id) ? <CheckSquare size={18}/> : <Square size={18}/>}
+              </button>
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-amber-100 group-hover:text-amber-500 transition-all"><Building2 size={24}/></div>
                 <div>
@@ -194,7 +216,7 @@ const InstituicoesAdmin: React.FC = () => {
               </div>
               <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); handleEdit(inst); }} className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Edit3 size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) deleteInstitution(inst.id); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
+                <button onClick={(e) => { e.stopPropagation(); if(confirm('Mover para Lixeira?')) moveToTrash('institution', [inst.id]); }} className="p-2 bg-rose-500 text-white rounded-xl shadow-lg"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
@@ -250,6 +272,19 @@ const InstituicoesAdmin: React.FC = () => {
               </div>
             </section>
           </div>
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom duration-200">
+          <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedIds.size} selecionada{selectedIds.size > 1 ? 's' : ''}</span>
+          <div className="w-px h-5 bg-slate-700" />
+          <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+            <Trash2 size={14} /> Mover para Lixeira
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800">
+            <X size={16} />
+          </button>
         </div>
       )}
 

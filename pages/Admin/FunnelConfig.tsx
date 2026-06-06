@@ -84,6 +84,14 @@ const FunnelConfig: React.FC = () => {
     setSelectedFunnel(updated);
   };
 
+  const handleDeleteStage = (stageId: string) => {
+    if (!selectedFunnel) return;
+    if (isStageOccupied(stageId)) { alert('Esta etapa está em uso por um ou mais clientes e não pode ser removida.'); return; }
+    const updated = { ...selectedFunnel, stages: selectedFunnel.stages.filter(s => s.id !== stageId) };
+    updateFunnel(updated);
+    setSelectedFunnel(updated);
+  };
+
   const handleAddStage = () => {
     if (!selectedFunnel) return;
     const newStage: FunnelStage = {
@@ -188,7 +196,7 @@ const FunnelConfig: React.FC = () => {
                           <option value="WON">Venda (Won)</option>
                           <option value="LOST">Perda (Lost)</option>
                        </select>
-                       <button onClick={() => isStageOccupied(stage.id) ? alert('Em uso!') : handleUpdateStage(stage.id, {})} className="p-3 text-slate-300 hover:text-rose-500"><Trash2 size={20}/></button>
+                       <button onClick={() => handleDeleteStage(stage.id)} className="p-3 text-slate-300 hover:text-rose-500" title="Remover etapa"><Trash2 size={20}/></button>
                     </div>
                  ))}
                  <button onClick={handleAddStage} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-[2rem] text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-amber-400 hover:text-amber-500 transition-all flex items-center justify-center gap-2"><Plus size={16}/> Adicionar Nova Etapa</button>

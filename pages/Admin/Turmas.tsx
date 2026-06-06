@@ -2,10 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../../store';
-import { 
-  Plus, GraduationCap, Calendar as CalendarIcon, Clock, X, Check, Building2, Trash2, Edit3, 
+import {
+  Plus, GraduationCap, Calendar as CalendarIcon, Clock, X, Check, Building2, Trash2, Edit3,
   ShoppingCart, Tag, DollarSign, Target, TrendingUp, FileSpreadsheet, Download, ExternalLink,
-  User, Briefcase, Zap
+  User, Briefcase, Zap, CheckSquare, Square
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import { ClassRoom, ClassProduct } from '../../types';
@@ -271,13 +271,29 @@ const ClassProductModal: React.FC<{
 };
 
 const TurmasAdmin: React.FC = () => {
-  const { classes, institutions, courses, addClass, updateClass, deleteClass, events, sales, removeClassProduct, products, users } = useData();
+  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users } = useData();
   const navigate = useNavigate();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [classToEdit, setClassToEdit] = useState<ClassRoom | null>(null);
   const [classProductModal, setClassProductModal] = useState<{ open: boolean, edit?: ClassProduct }>({ open: false });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAll = () => setSelectedIds(prev =>
+    prev.size === sortedClasses.length ? new Set() : new Set(sortedClasses.map(c => c.id))
+  );
+  const handleBulkDelete = () => {
+    if (!selectedIds.size) return;
+    if (!confirm(`Mover ${selectedIds.size} turma(s) para a Lixeira?`)) return;
+    moveToTrash('class', [...selectedIds]);
+    setSelectedIds(new Set());
+    setSelectedClassId(null);
+  };
 
   const sortedClasses = useMemo(() => {
     return [...classes].sort((a, b) => {
@@ -387,6 +403,11 @@ const TurmasAdmin: React.FC = () => {
             <table className="w-full text-left">
               <thead>
                 <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+                  <th className="px-4 py-5 w-12">
+                    <button onClick={toggleSelectAll} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                      {selectedIds.size === sortedClasses.length && sortedClasses.length > 0 ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16}/>}
+                    </button>
+                  </th>
                   <th className="px-8 py-5">Identificação da Turma</th>
                   <th className="px-8 py-5">Instituição</th>
                   <th className="px-8 py-5">Formação</th>
@@ -395,11 +416,16 @@ const TurmasAdmin: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {sortedClasses.map(cls => (
-                  <tr 
-                    key={cls.id} 
-                    className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClassId === cls.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''}`}
+                  <tr
+                    key={cls.id}
+                    className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClassId === cls.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : selectedIds.has(cls.id) ? 'bg-rose-50' : ''}`}
                     onClick={() => setSelectedClassId(cls.id)}
                   >
+                    <td className="px-4 py-5" onClick={e => e.stopPropagation()}>
+                      <button onClick={(e) => toggleSelect(cls.id, e)} className="p-1 rounded hover:bg-slate-200 transition-colors">
+                        {selectedIds.has(cls.id) ? <CheckSquare size={16} className="text-rose-500"/> : <Square size={16} className="text-slate-300"/>}
+                      </button>
+                    </td>
                     <td className="px-8 py-5">
                       <div>
                         <p className="font-black text-slate-900 text-sm leading-tight group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cls.name}</p>
@@ -425,7 +451,7 @@ const TurmasAdmin: React.FC = () => {
                     <td className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={(e) => { e.stopPropagation(); setClassToEdit(cls); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all"><Edit3 size={18} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir turma?')) deleteClass(cls.id); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Mover para Lixeira?')) moveToTrash('class', [cls.id]); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
                       </div>
                     </td>
                   </tr>
@@ -697,6 +723,19 @@ const TurmasAdmin: React.FC = () => {
               </div>
             </section>
           </div>
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom duration-200">
+          <span className="text-xs font-black uppercase tracking-widest text-slate-300">{selectedIds.size} turma{selectedIds.size > 1 ? 's' : ''} selecionada{selectedIds.size > 1 ? 's' : ''}</span>
+          <div className="w-px h-5 bg-slate-700" />
+          <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+            <Trash2 size={14} /> Mover para Lixeira
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800">
+            <X size={16} />
+          </button>
         </div>
       )}
 

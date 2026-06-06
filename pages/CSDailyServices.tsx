@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../store';
-import { 
-  Plus, Headset, X, Edit3, Trash2, MessageSquare, 
-  Send, User, Search, Calendar, CheckCircle2, 
-  Filter, Building2, ChevronDown, Phone, Mail, 
+import {
+  Plus, Headset, X, Edit3, Trash2, MessageSquare,
+  Send, User, Search, Calendar, CheckCircle2,
+  Filter, Building2, ChevronDown, Phone, Mail,
   Clock, Download, FileSpreadsheet, Check, UserPlus,
-  AlertCircle
+  AlertCircle, CheckSquare, Square
 } from 'lucide-react';
 import { CSDailyService, UserRole, Client } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
@@ -187,10 +187,24 @@ const ServiceModal: React.FC<{
 };
 
 const CSDailyServicesView: React.FC = () => {
-  const { csDailyServices, clients, classes, users, deleteCSDailyService } = useData();
+  const { csDailyServices, clients, classes, users, moveToTrash } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<CSDailyService | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAll = () => setSelectedIds(prev =>
+    prev.size === filteredServices.length ? new Set() : new Set(filteredServices.map(s => s.id))
+  );
+  const handleBulkDelete = () => {
+    if (!selectedIds.size) return;
+    if (!confirm(`Mover ${selectedIds.size} atendimento(s) para a Lixeira?`)) return;
+    moveToTrash('csDailyService', [...selectedIds]);
+    setSelectedIds(new Set());
+  };
 
   const filteredServices = useMemo(() => {
     return csDailyServices.filter(s => {
@@ -269,6 +283,11 @@ const CSDailyServicesView: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10">
+                <th className="px-4 py-5 w-10">
+                  <button onClick={toggleSelectAll} className="text-slate-400 hover:text-amber-600 transition-colors">
+                    {selectedIds.size === filteredServices.length && filteredServices.length > 0 ? <CheckSquare size={16}/> : <Square size={16}/>}
+                  </button>
+                </th>
                 <th className="px-8 py-5">Data / Meio</th>
                 <th className="px-8 py-5">Identificação</th>
                 <th className="px-8 py-5">Resumo Técnico</th>
@@ -283,7 +302,12 @@ const CSDailyServicesView: React.FC = () => {
                 const user = users.find(u => u.id === service.responsibleUserId);
 
                 return (
-                  <tr key={service.id} className="hover:bg-amber-50/30 transition-colors group">
+                  <tr key={service.id} className={`hover:bg-amber-50/30 transition-colors group ${selectedIds.has(service.id) ? 'bg-amber-50' : ''}`}>
+                    <td className="px-4 py-5">
+                      <button onClick={() => toggleSelect(service.id)} className="text-slate-400 hover:text-amber-600 transition-colors">
+                        {selectedIds.has(service.id) ? <CheckSquare size={16} className="text-amber-500"/> : <Square size={16}/>}
+                      </button>
+                    </td>
                     <td className="px-8 py-5">
                       <div>
                         <p className="text-sm font-black text-slate-900">{new Date(service.date).toLocaleDateString('pt-BR')}</p>
@@ -319,7 +343,7 @@ const CSDailyServicesView: React.FC = () => {
                     <td className="px-8 py-5 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                           <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm"><Edit3 size={18}/></button>
-                          <button onClick={() => { if(confirm('Excluir este registro?')) deleteCSDailyService(service.id); }} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>
+                          <button onClick={() => moveToTrash('csDailyService', [service.id])} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>
                        </div>
                     </td>
                   </tr>
@@ -327,7 +351,7 @@ const CSDailyServicesView: React.FC = () => {
               })}
               {filteredServices.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-24 text-center">
+                  <td colSpan={6} className="py-24 text-center">
                      <div className="flex flex-col items-center opacity-10">
                         <Headset size={64} className="mb-4" />
                         <p className="font-black uppercase text-xs tracking-widest">Nenhum registro de contato</p>
@@ -339,6 +363,16 @@ const CSDailyServicesView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl">
+          <span className="text-sm font-black">{selectedIds.size} selecionado(s)</span>
+          <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-black px-4 py-2 rounded-xl transition-all">
+            <Trash2 size={14}/> Mover para Lixeira
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="p-2 hover:bg-slate-700 rounded-xl transition-all"><X size={14}/></button>
+        </div>
+      )}
 
       {isModalOpen && <ServiceModal serviceToEdit={serviceToEdit} onClose={() => setIsModalOpen(false)} />}
     </div>

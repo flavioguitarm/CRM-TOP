@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../store';
-import { 
-  Plus, Search, FileUp, MoreHorizontal, X, User, Mail, Phone, GraduationCap, Building2, AlertCircle, ChevronDown, Edit3, Filter, Tags, FileSpreadsheet, Calendar, Download, Check, Trash2
+import {
+  Plus, Search, FileUp, MoreHorizontal, X, User, Mail, Phone, GraduationCap, Building2, AlertCircle, ChevronDown, Edit3, Filter, Tags, FileSpreadsheet, Calendar, Download, Check, Trash2, CheckSquare, Square
 } from 'lucide-react';
 import { Client, UserRole, ClassRoom, Campus, Sale, ProductNegotiation } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
@@ -293,7 +293,7 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
 };
 
 const ClientsView: React.FC = () => {
-  const { clients, institutions, classes, currentUser, addClient, updateClient, addSale, updateSale, courses, sales, negotiations, products, addNegotiation, updateNegotiationStatus } = useData();
+  const { clients, institutions, classes, currentUser, addClient, updateClient, addSale, updateSale, courses, sales, negotiations, products, addNegotiation, updateNegotiationStatus, moveToTrash } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -302,6 +302,22 @@ const ClientsView: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleSelectAll = () => setSelectedIds(prev =>
+    prev.size === filteredClients.length ? new Set() : new Set(filteredClients.map(c => c.id))
+  );
+  const handleBulkDelete = () => {
+    if (!selectedIds.size) return;
+    if (!confirm(`Mover ${selectedIds.size} cliente(s) para a Lixeira?`)) return;
+    if (selectedIds.has(selectedClientId || '')) setSelectedClientId(null);
+    moveToTrash('client', [...selectedIds]);
+    setSelectedIds(new Set());
+  };
 
   const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
 
@@ -538,14 +554,36 @@ const ClientsView: React.FC = () => {
 
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left">
-              <thead><tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-white sticky top-0 z-10"><th className="px-8 py-5">Nome / Contato</th><th className="px-8 py-5">Instituição / Turma</th><th className="px-8 py-5">Etiquetas</th><th className="px-8 py-5 text-right">Ações</th></tr></thead>
+              <thead>
+                <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-white sticky top-0 z-10">
+                  <th className="px-4 py-5 w-10">
+                    <button onClick={toggleSelectAll} className="text-slate-400 hover:text-amber-600 transition-colors">
+                      {selectedIds.size === filteredClients.length && filteredClients.length > 0 ? <CheckSquare size={16}/> : <Square size={16}/>}
+                    </button>
+                  </th>
+                  <th className="px-8 py-5">Nome / Contato</th>
+                  <th className="px-8 py-5">Instituição / Turma</th>
+                  <th className="px-8 py-5">Etiquetas</th>
+                  <th className="px-8 py-5 text-right">Ações</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredClients.map(client => (
-                  <tr key={client.id} className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClientId === client.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''}`} onClick={() => setSelectedClientId(client.id)}>
+                  <tr key={client.id} className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClientId === client.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''} ${selectedIds.has(client.id) ? 'bg-amber-50' : ''}`} onClick={() => setSelectedClientId(client.id)}>
+                    <td className="px-4 py-5" onClick={e => e.stopPropagation()}>
+                      <button onClick={e => toggleSelect(client.id, e)} className="text-slate-400 hover:text-amber-600 transition-colors">
+                        {selectedIds.has(client.id) ? <CheckSquare size={16} className="text-amber-500"/> : <Square size={16}/>}
+                      </button>
+                    </td>
                     <td className="px-8 py-5"><div><p className="font-black text-slate-900 text-sm leading-tight group-hover:text-amber-600 transition-colors uppercase tracking-tight">{client.name}</p><p className="text-[10px] font-bold text-slate-300 uppercase mt-0.5 flex items-center gap-1"><Calendar size={10} /> Criado em: {new Date(client.createdAt).toLocaleDateString()}</p><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">{client.phone} • {client.email}</p></div></td>
                     <td className="px-8 py-5"><div><p className="text-xs font-black text-slate-700">{institutions.find(i => i.id === client.institutionId)?.name || 'N/A'}</p><p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 tracking-widest">{classes.find(c => c.id === client.classId)?.name || 'Sem Turma'}</p></div></td>
                     <td className="px-8 py-5"><div className="flex flex-wrap gap-1.5">{client.tags.map(tag => (<span key={tag} className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-slate-900 text-white uppercase tracking-tighter shadow-sm">{tag}</span>))}</div></td>
-                    <td className="px-8 py-5 text-right"><button onClick={(e) => { e.stopPropagation(); setClientToEdit(client); setIsModalOpen(true); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm"><MoreHorizontal size={20} className="text-slate-400 group-hover:text-amber-500"/></button></td>
+                    <td className="px-8 py-5 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={(e) => { e.stopPropagation(); setClientToEdit(client); setIsModalOpen(true); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Editar"><MoreHorizontal size={20} className="text-slate-400 hover:text-amber-500"/></button>
+                        <button onClick={(e) => { e.stopPropagation(); if (selectedClientId === client.id) setSelectedClientId(null); moveToTrash('client', [client.id]); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Mover para Lixeira"><Trash2 size={18} className="text-slate-400 hover:text-rose-500"/></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -577,7 +615,17 @@ const ClientsView: React.FC = () => {
         </div>
       )}
 
-      {isModalOpen && <ClientModal client={clientToEdit} onClose={() => setIsModalOpen(false)} onSave={(data) => { if (clientToEdit) updateClient({...clientToEdit, ...data} as Client); else addClient({...data, id: `cli-${Date.now()}`, activities: []} as Client); setIsModalOpen(false); }} />}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl">
+          <span className="text-sm font-black">{selectedIds.size} selecionado(s)</span>
+          <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-black px-4 py-2 rounded-xl transition-all">
+            <Trash2 size={14}/> Mover para Lixeira
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="p-2 hover:bg-slate-700 rounded-xl transition-all"><X size={14}/></button>
+        </div>
+      )}
+
+      {isModalOpen && <ClientModal client={clientToEdit} onClose={() => setIsModalOpen(false)} onSave={(data) => { if (clientToEdit) updateClient({...clientToEdit, ...data} as Client); else addClient({...data, id: crypto.randomUUID(), activities: []} as Client); setIsModalOpen(false); }} />}
       
       {isImportModalOpen && (
         <BulkImportModal 

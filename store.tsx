@@ -48,6 +48,8 @@ interface DataContextType {
   syncWithGoogleSheet: () => Promise<void>;
   moveToTrash: (entityType: TrashItem['entityType'], ids: string[]) => void;
   restoreFromTrash: (trashId: string) => void;
+  permanentDeleteFromTrash: (trashIds: string[]) => void;
+  purgeExpiredTrash: () => void;
   updateClientStage: (clientId: string, newStageId: string) => void;
   addClientActivity: (clientId: string, activity: any) => void;
   addClient: (client: Client) => void;
@@ -971,6 +973,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setTrash(p => p.filter(t => t.id !== trashId));
+  };
+
+  const permanentDeleteFromTrash = (trashIds: string[]) => {
+    setTrash(p => p.filter(t => !trashIds.includes(t.id)));
+  };
+
+  const purgeExpiredTrash = () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    setTrash(p => p.filter(t => new Date(t.deletedAt) >= cutoff));
   };
 
   const canDeleteEntity = (type: TrashItem['entityType'], id: string) => {
@@ -1997,7 +2009,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clients, setClients, events, setEvents, tasks, setTasks, activityTypes, setActivityTypes, sales, setSales,
       negotiations, setNegotiations, csActions, setCsActions, csDailyServices, setCsDailyServices, trash,
       googleSheetUrl, setGoogleSheetUrl, syncWithGoogleSheet,
-      moveToTrash, restoreFromTrash,
+      moveToTrash, restoreFromTrash, permanentDeleteFromTrash, purgeExpiredTrash,
       updateClientStage, addClientActivity, addClient, updateClient,
       addInstitution, updateInstitution, deleteInstitution,
       addCourse, updateCourse, deleteCourse,
