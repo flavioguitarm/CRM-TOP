@@ -57,30 +57,38 @@ const Sidebar: React.FC = () => {
         sidebarCollapsed ? 'w-20' : 'w-64'
       }`}
     >
-      <div className={`px-4 py-5 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-        {/* Logo expandido */}
-        {!sidebarCollapsed && (
+      {/* ── Header do Sidebar ── */}
+      {sidebarCollapsed ? (
+        /* Colapsado: logo + toggle empilhados e centralizados */
+        <div className="flex flex-col items-center gap-3 pt-5 pb-4 px-2">
           <img
             src="/assets/logo-top.png.png"
             alt="TOP Formaturas"
-            className="h-10 w-auto object-contain animate-in fade-in duration-300"
+            className="h-10 w-full object-contain"
           />
-        )}
-        {/* Logo colapsado — ícone quadrado */}
-        {sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-sm"
+          >
+            <Menu size={18} />
+          </button>
+        </div>
+      ) : (
+        /* Expandido: logo centralizado + toggle no canto direito */
+        <div className="relative flex items-center justify-center pt-6 pb-5 px-4">
           <img
             src="/assets/logo-top.png.png"
-            alt="TOP"
-            className="h-8 w-8 object-contain"
+            alt="TOP Formaturas"
+            className="h-14 w-auto object-contain animate-in fade-in duration-300"
           />
-        )}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-sm shrink-0"
-        >
-          {sidebarCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
-        </button>
-      </div>
+          <button
+            onClick={() => setSidebarCollapsed(true)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-sm"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        </div>
+      )}
 
       <nav className="flex-1 px-3 space-y-1">
         {!sidebarCollapsed ? (
