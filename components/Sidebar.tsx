@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Funnel, 
-  Users, 
-  Settings, 
-  GraduationCap, 
-  Building2, 
-  BookOpen, 
-  Package, 
+import {
+  LayoutDashboard,
+  Funnel,
+  Users,
+  Settings,
+  GraduationCap,
+  Building2,
+  BookOpen,
+  Package,
   Calendar,
   UserCircle2,
   ChevronDown,
@@ -20,7 +20,8 @@ import {
   Trash2,
   ShieldCheck,
   Tag,
-  Headset
+  Headset,
+  HardDriveDownload,
 } from 'lucide-react';
 import { useData } from '../store';
 import { UserRole } from '../types';
@@ -51,7 +52,8 @@ const Sidebar: React.FC = () => {
     { path: '/admin/usuarios', label: 'Usuários', icon: UserCircle2 },
     { path: '/admin/funis', label: 'Config. Funil', icon: Funnel },
     { path: '/admin/seguranca', label: 'Segurança', icon: ShieldCheck },
-    { path: '/admin/lixeira', label: 'Lixeira', icon: Trash2 },
+    { path: '/admin/backup',    label: 'Backup & Restore', icon: HardDriveDownload },
+    { path: '/admin/lixeira',   label: 'Lixeira', icon: Trash2 },
   ];
 
   return (

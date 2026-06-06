@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-05 (Sessão 4)
+> Atualizado em: 2026-06-06 (Sessão 5)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -38,7 +38,9 @@ CRM-TOP/
 │   ├── lib/supabase.ts             # Cliente Supabase (createClient com variáveis de ambiente)
 │   ├── hooks/useAuth.ts            # AuthProvider + useAuth (session, signIn, signOut)
 │   └── components/Auth/
-│       └── LoginPage.tsx           # Tela de login (email + senha, visual dark slate/amber)
+│       ├── LoginPage.tsx           # Tela de login (email + senha, visual dark slate/amber)
+│       ├── ForgotPasswordPage.tsx  # Tela "esqueci minha senha" (envia email via Supabase Auth)
+│       └── ResetPasswordPage.tsx   # Tela de redefinição de senha (supabase.auth.updateUser)
 │
 ├── components/
 │   ├── Header.tsx                  # Barra superior (notificações, menu do usuário, logout)
@@ -62,7 +64,8 @@ CRM-TOP/
 │       ├── Users.tsx               # CRUD de usuários
 │       ├── FunnelConfig.tsx        # Configuração de funis e etapas
 │       ├── ActivityTypes.tsx       # Tipos de atividade
-│       ├── Database.tsx            # Export/import/reset do banco
+│       ├── Database.tsx            # Export/import/reset do banco (legacy)
+│       ├── Backup.tsx              # Backup & Restore completo (exportAllData / importAllData)
 │       └── Trash.tsx               # Lixeira (restore de itens deletados)
 │
 └── supabase/
@@ -76,7 +79,8 @@ CRM-TOP/
 
 - **Supabase Auth** via `src/hooks/useAuth.ts` (`AuthProvider` + `useAuth`)
 - `AuthProvider` envolve toda a árvore em `App.tsx`
-- `ProtectedRoute` exibe spinner → `LoginPage` → app conforme estado de sessão
+- `ProtectedRoute` gerencia três views: `'login'` → `LoginPage`, `'forgot'` → `ForgotPasswordPage`, `'reset'` → `ResetPasswordPage`
+- Listener `onAuthStateChange` detecta `PASSWORD_RECOVERY` e ativa view `'reset'` automaticamente
 - `AuthSync` (componente interno em `App.tsx`) sincroniza `session.user` → `currentUser` do store:
   - Busca o usuário por e-mail no array `users` do store
   - Fallback: cria perfil mínimo com `role: 'ADMIN'` (padrão enquanto tabela `users` não for fonte de verdade)
@@ -212,6 +216,54 @@ Toda a migração store → Supabase está concluída. Apenas `trash` e `googleS
 
 ---
 
+---
+
+## ✅ Sessão 5 — Recuperação de Senha + Backup & Restore (2026-06-06)
+
+### Recuperação de Senha
+
+**Arquivos criados/modificados:**
+
+- `src/components/Auth/LoginPage.tsx` — adicionado prop `onForgotPassword?: () => void` e link "Esqueci minha senha" abaixo do campo de senha
+- `src/components/Auth/ForgotPasswordPage.tsx` (**NOVO**) — formulário para envio de e-mail de recuperação via `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] })`; mostra estado de sucesso após envio
+- `src/components/Auth/ResetPasswordPage.tsx` (**NOVO**) — formulário para definir nova senha; valida mínimo 6 chars e confirmação; chama `supabase.auth.updateUser({ password })`; indicador visual de senhas coincidentes; redireciona para login após 2s
+- `App.tsx` — `ProtectedRoute` usa `type AuthView = 'login' | 'forgot' | 'reset'`; listener `onAuthStateChange` detecta `PASSWORD_RECOVERY` e muda para view `reset`
+
+**Notas técnicas:**
+- `redirectTo` = `window.location.href.split('#')[0]` (URL base sem fragment, evita conflito com HashRouter)
+- supabase-js v2 detecta `#access_token=...&type=recovery` no fragment automaticamente ao carregar
+- View `reset` exibida mesmo com sessão ativa (Supabase cria sessão temporária durante recovery)
+
+### Backup & Restore
+
+**Arquivos criados/modificados:**
+
+- `store.tsx` — `exportAllData()` e `importAllData(json)` adicionadas ao `DataContextType` e ao `DataProvider`
+- `pages/Admin/Backup.tsx` (**NOVO**) — página com cards Export e Import, fases, preview, confirmação inline
+- `App.tsx` — rota `/admin/backup` adicionada
+- `components/Sidebar.tsx` — item "Backup & Restore" com ícone `HardDriveDownload`
+
+**`exportAllData()`:** busca 23 tabelas em paralelo (`Promise.all`), gera `{ version: '2.0', exportedAt, tenantId, tables }`
+
+**`importAllData(json)`:** valida v2.0, deleta em ordem FK (folhas → raízes), reinsere com `tenant_id` atual em chunks de 200 linhas
+
+**Ordem de deleção (FK-safe):**
+`sales → product_negotiations → client_tasks → cs_daily_services → cs_action_activities → cs_actions → event_activities → events → client_activities → clients → class_timeline_events → class_products → classes → funnel_stages → funnels → activity_types → users → products → product_categories → courses → institutions`
+
+---
+
+## Próximos passos
+
+### Etapa 3 — Backups automáticos
+- Agendamento periódico (diário/semanal) via cron ou Supabase Edge Function
+- Armazenamento no Supabase Storage
+- Histórico com download individual e notificação por e-mail
+
+### Etapa 4 — Edição/exclusão em massa
+- Seleção múltipla nas listagens principais
+- Ações em lote: excluir, mover para lixeira, editar campo
+- Import via planilha com detecção de duplicatas e opção de merge
+
 ## Variáveis de ambiente (`.env.local`)
 
 ```
@@ -236,3 +288,6 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 6. **`AuthSync`** em `App.tsx` roda fora do `ProtectedRoute` mas dentro do `Router` e do `DataProvider` — ele é um componente que retorna `null` e serve só para executar o `useEffect` de sincronização.
 
 7. **Importações cruzadas:** `src/hooks/useAuth.ts` importa de `@/src/lib/supabase`. `components/Header.tsx` importa de `../src/hooks/useAuth`. Isso funciona porque o alias `@` aponta para a raiz.
+8. **`events.id`** deve ser UUID válido — usar `crypto.randomUUID()` (não `evt-${Date.now()}`). O campo `end_date_time` é `NOT NULL` — usar `event.endDateTime || event.startDateTime || new Date().toISOString()` como fallback.
+
+9. **Erro pré-existente não bloqueante:** `src/lib/supabase.ts(3,33): error TS2339: Property 'env' does not exist on type 'ImportMeta'` — presente antes da Sessão 5, não afeta o funcionamento em runtime com Vite.

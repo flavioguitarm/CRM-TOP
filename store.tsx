@@ -106,6 +106,8 @@ interface DataContextType {
   resetDatabase: () => void;
   exportDatabase: () => string;
   importDatabase: (jsonData: string) => void;
+  exportAllData: () => Promise<string>;
+  importAllData: (json: string) => Promise<void>;
 }
 
 const STORAGE_KEY = 'crm_top_formaturas_v1_prod_v3';
@@ -1780,6 +1782,157 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteCSDailyService = (id: string) => moveToTrash('csDailyService', [id]);
 
+  // ── Backup/Restore completo via Supabase ─────────────────────────────────────
+
+  /** Busca todas as tabelas do tenant no Supabase e retorna um JSON pronto para download. */
+  const exportAllData = async (): Promise<string> => {
+    if (!tenantId) throw new Error('Usuário não autenticado.');
+
+    const byTenant = (table: string) =>
+      supabase.from(table).select('*').eq('tenant_id', tenantId).limit(10000).then(r => {
+        if (r.error) throw new Error(`Erro ao ler ${table}: ${r.error.message}`);
+        return r.data ?? [];
+      });
+
+    // Junction tables sem tenant_id — buscamos pelo FK do pai
+    const byIds = (table: string, col: string, ids: string[]) => {
+      if (!ids.length) return Promise.resolve([]);
+      return supabase.from(table).select('*').in(col, ids).limit(10000).then(r => {
+        if (r.error) throw new Error(`Erro ao ler ${table}: ${r.error.message}`);
+        return r.data ?? [];
+      });
+    };
+
+    const [
+      institutions, courses, product_categories, users, activity_types,
+      funnels, products, classes,
+      clients, events, cs_actions, cs_daily_services,
+      product_negotiations, sales, client_tasks,
+      class_products, class_timeline_events, client_activities,
+      event_activities, cs_action_activities,
+    ] = await Promise.all([
+      byTenant('institutions'), byTenant('courses'), byTenant('product_categories'),
+      byTenant('users'), byTenant('activity_types'),
+      byTenant('funnels'), byTenant('products'), byTenant('classes'),
+      byTenant('clients'), byTenant('events'), byTenant('cs_actions'),
+      byTenant('cs_daily_services'), byTenant('product_negotiations'),
+      byTenant('sales'), byTenant('client_tasks'),
+      byTenant('class_products'), byTenant('class_timeline_events'),
+      byTenant('client_activities'), byTenant('event_activities'),
+      byTenant('cs_action_activities'),
+    ]);
+
+    // Junction tables sem tenant_id
+    const [funnel_stages, funnel_responsible_users, class_courses] = await Promise.all([
+      byIds('funnel_stages',            'funnel_id', funnels.map((f: any) => f.id)),
+      byIds('funnel_responsible_users', 'funnel_id', funnels.map((f: any) => f.id)),
+      byIds('class_courses',            'class_id',  classes.map((c: any) => c.id)),
+    ]);
+
+    return JSON.stringify({
+      version:    '2.0',
+      exportedAt: new Date().toISOString(),
+      tenantId,
+      tables: {
+        institutions, courses, product_categories, users, activity_types,
+        funnels, funnel_stages, funnel_responsible_users,
+        products, classes, class_courses, class_products, class_timeline_events,
+        clients, client_activities,
+        events, event_activities,
+        cs_actions, cs_action_activities, cs_daily_services,
+        product_negotiations, sales, client_tasks,
+      },
+    }, null, 2);
+  };
+
+  /** Recebe um JSON exportado por exportAllData, apaga os dados do tenant e reinsere tudo. */
+  const importAllData = async (json: string): Promise<void> => {
+    if (!tenantId) throw new Error('Usuário não autenticado.');
+
+    const parsed = JSON.parse(json);
+    if (parsed.version !== '2.0' || !parsed.tables) {
+      throw new Error('Formato de backup inválido. Use um arquivo gerado por esta ferramenta.');
+    }
+
+    const t = parsed.tables;
+    const tid = tenantId;
+
+    // Helper: apaga todos os registros do tenant em uma tabela (com tenant_id)
+    const wipe = (table: string) =>
+      supabase.from(table).delete().eq('tenant_id', tid).then(r => {
+        if (r.error) console.error(`wipe ${table}:`, r.error.message);
+      });
+
+    // Helper: insere em lotes (máx 200 por requisição)
+    const insertChunked = async (table: string, rows: any[]) => {
+      if (!rows.length) return;
+      for (let i = 0; i < rows.length; i += 200) {
+        const chunk = rows.slice(i, i + 200);
+        const { error } = await supabase.from(table).insert(chunk);
+        if (error) throw new Error(`Erro ao inserir em ${table}: ${error.message}`);
+      }
+    };
+
+    // Helper: substitui tenant_id de cada row pelo tenant atual
+    const withTid = (rows: any[]) =>
+      rows.map((r: any) => ({ ...r, tenant_id: tid }));
+
+    // ── 1. Apagar na ordem correta (filhos antes dos pais) ──────────────────
+    // Etapa 1: tabelas que referenciam outras (sem cascata automática suficiente)
+    await wipe('sales');
+    await wipe('product_negotiations');
+    await wipe('client_tasks');
+    await wipe('cs_daily_services');
+    await wipe('cs_action_activities');
+    await wipe('cs_actions');
+    await wipe('event_activities');
+    await wipe('events');
+    await wipe('client_activities');
+    await wipe('clients');
+    // class_products, class_timeline_events têm tenant_id, melhor apagar explicitamente
+    await wipe('class_timeline_events');
+    await wipe('class_products');
+    // class_courses (junction sem tenant_id) — cascateia quando classes for deletada
+    await wipe('classes');
+    // funnel_stages tem tenant_id
+    await wipe('funnel_stages');
+    // funnels cascateia funnel_responsible_users
+    await wipe('funnels');
+    await wipe('activity_types');
+    await wipe('users');
+    await wipe('products');
+    await wipe('product_categories');
+    await wipe('courses');
+    await wipe('institutions');
+
+    // ── 2. Inserir na ordem correta (pais antes dos filhos) ─────────────────
+    await insertChunked('institutions',            withTid(t.institutions            ?? []));
+    await insertChunked('courses',                 withTid(t.courses                 ?? []));
+    await insertChunked('product_categories',      withTid(t.product_categories      ?? []));
+    await insertChunked('users',                   withTid(t.users                   ?? []));
+    await insertChunked('activity_types',          withTid(t.activity_types          ?? []));
+    await insertChunked('products',                withTid(t.products                ?? []));
+    await insertChunked('funnels',                 withTid(t.funnels                 ?? []));
+    await insertChunked('funnel_stages',           withTid(t.funnel_stages           ?? []));
+    // funnel_responsible_users: sem tenant_id, inserir como está
+    await insertChunked('funnel_responsible_users',        t.funnel_responsible_users ?? []);
+    await insertChunked('classes',                 withTid(t.classes                 ?? []));
+    // class_courses: sem tenant_id
+    await insertChunked('class_courses',                   t.class_courses           ?? []);
+    await insertChunked('class_products',          withTid(t.class_products          ?? []));
+    await insertChunked('class_timeline_events',   withTid(t.class_timeline_events   ?? []));
+    await insertChunked('clients',                 withTid(t.clients                 ?? []));
+    await insertChunked('client_activities',       withTid(t.client_activities       ?? []));
+    await insertChunked('events',                  withTid(t.events                  ?? []));
+    await insertChunked('event_activities',        withTid(t.event_activities        ?? []));
+    await insertChunked('cs_actions',              withTid(t.cs_actions              ?? []));
+    await insertChunked('cs_action_activities',    withTid(t.cs_action_activities    ?? []));
+    await insertChunked('cs_daily_services',       withTid(t.cs_daily_services       ?? []));
+    await insertChunked('product_negotiations',    withTid(t.product_negotiations    ?? []));
+    await insertChunked('sales',                   withTid(t.sales                   ?? []));
+    await insertChunked('client_tasks',            withTid(t.client_tasks            ?? []));
+  };
+
   const resetDatabase = () => {
     if (confirm("ATENÇÃO: Você perderá TODOS os dados atuais. Deseja continuar?")) {
       localStorage.clear();
@@ -1811,7 +1964,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addClassProduct, updateClassProduct, removeClassProduct,
       addCSAction, updateCSAction, addCSActionActivity, deleteCSAction,
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
-      resetDatabase, exportDatabase, importDatabase
+      resetDatabase, exportDatabase, importDatabase,
+      exportAllData, importAllData,
     }}>
       {children}
     </DataContext.Provider>
