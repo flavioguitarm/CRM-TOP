@@ -181,8 +181,8 @@ const AgendaView: React.FC = () => {
                 statusStyle = "bg-emerald-500";
                 statusLabelStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
               } else if (e.status === 'Realizado') {
-                statusStyle = "bg-indigo-500";
-                statusLabelStyle = "bg-indigo-50 text-indigo-700 border-indigo-100";
+                statusStyle = "bg-slate-700";
+                statusLabelStyle = "bg-slate-100 text-slate-700 border-slate-200";
               }
 
               return (
@@ -293,7 +293,7 @@ const AgendaView: React.FC = () => {
                       {dayData.events.slice(0, 2).map(e => {
                         let dotColor = "bg-slate-400";
                         if (e.status === 'Confirmado') dotColor = "bg-emerald-500";
-                        else if (e.status === 'Realizado') dotColor = "bg-indigo-500";
+                        else if (e.status === 'Realizado') dotColor = "bg-slate-600";
                         return (
                           <div key={e.id} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 truncate uppercase flex items-center gap-1">
                             <span className={`w-1 h-1 rounded-full ${dotColor}`} /> {e.name}
@@ -399,7 +399,7 @@ const AgendaView: React.FC = () => {
                 if (item.isCS) labelStyle = "bg-amber-500 text-white border-amber-600";
                 else if (item.isTask) labelStyle = "bg-rose-500 text-white border-rose-600";
                 else if (item.status === 'Confirmado') labelStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
-                else if (item.status === 'Realizado') labelStyle = "bg-indigo-50 text-indigo-700 border-indigo-100";
+                else if (item.status === 'Realizado') labelStyle = "bg-slate-100 text-slate-700 border-slate-200";
 
                 return (
                   <div 

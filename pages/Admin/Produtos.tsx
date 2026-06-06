@@ -232,7 +232,7 @@ const ProdutosAdmin: React.FC = () => {
                      </button>
                      <div className="flex justify-between items-start mb-4">
                        <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><ShoppingCart size={24}/></div>
-                       <span className="text-[9px] font-black px-2 py-1 rounded-lg border uppercase bg-blue-50 text-blue-600 border-blue-100">
+                       <span className="text-[9px] font-black px-2 py-1 rounded-lg border uppercase bg-amber-50 text-amber-700 border-amber-200">
                          {cat?.name || 'Sem Categoria'}
                        </span>
                      </div>
@@ -325,7 +325,7 @@ const ProdutosAdmin: React.FC = () => {
               <div className="space-y-4 w-full">
                 <h3 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">{selectedProd.name}</h3>
                 <div className="flex justify-center mb-6">
-                   <span className="text-xs font-black px-4 py-1.5 rounded-full border-2 uppercase tracking-widest bg-blue-50 text-blue-600 border-blue-100">
+                   <span className="text-xs font-black px-4 py-1.5 rounded-full border-2 uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-300">
                       {productCategories.find(c => c.id === selectedProd.categoryId)?.name || 'Sem Categoria'}
                    </span>
                 </div>

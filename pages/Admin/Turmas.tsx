@@ -487,10 +487,10 @@ const TurmasAdmin: React.FC = () => {
               const isOvermeta = pct >= 100;
               
               return (
-                <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 rounded-[2rem] text-white space-y-4 border border-indigo-900/40 shadow-xl">
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 rounded-[2rem] text-white space-y-4 border border-slate-700/40 shadow-xl">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1 animate-pulse">
+                      <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1 animate-pulse">
                         VGV Total das Metas vs ERP Oficial
                       </p>
                       <h3 className="text-2xl font-black text-white">
@@ -501,7 +501,7 @@ const TurmasAdmin: React.FC = () => {
                       </h3>
                     </div>
                     <div>
-                      <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${isOvermeta ? 'bg-emerald-500 text-white animate-bounce' : 'bg-indigo-900/60 text-indigo-200 border border-indigo-800'}`}>
+                      <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${isOvermeta ? 'bg-emerald-500 text-white animate-bounce' : 'bg-slate-800/80 text-slate-300 border border-slate-700'}`}>
                         {isOvermeta ? '🔥 Overmeta' : 'Meta Comercial'}
                       </span>
                     </div>

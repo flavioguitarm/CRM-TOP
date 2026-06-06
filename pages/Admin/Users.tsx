@@ -170,7 +170,7 @@ const UsersAdmin: React.FC = () => {
 
   const getRoleBadge = (role: UserRole) => {
     switch(role) {
-      case UserRole.ADMIN: return 'bg-purple-100 text-purple-700';
+      case UserRole.ADMIN: return 'bg-slate-900 text-white';
       case UserRole.CONSULTOR: return 'bg-amber-100 text-amber-700';
       case UserRole.VISUALIZADOR: return 'bg-slate-100 text-slate-700';
       default: return 'bg-slate-100 text-slate-700';
@@ -265,11 +265,11 @@ const UsersAdmin: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 bg-purple-50 rounded-xl border border-purple-100 flex flex-col items-start gap-4">
-          <div className="p-3 bg-purple-100 rounded-lg text-purple-600"><Shield size={24} /></div>
+        <div className="p-6 bg-slate-900 rounded-xl border border-slate-700 flex flex-col items-start gap-4">
+          <div className="p-3 bg-slate-800 rounded-lg text-amber-400"><Shield size={24} /></div>
           <div>
-            <h3 className="font-bold text-purple-900 mb-2">Administrador (Gerente)</h3>
-            <p className="text-sm text-purple-700 leading-relaxed">Acesso total ao sistema, gestão financeira e exclusão de usuários.</p>
+            <h3 className="font-bold text-white mb-2">Administrador (Gerente)</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">Acesso total ao sistema, gestão financeira e exclusão de usuários.</p>
           </div>
         </div>
         <div className="p-6 bg-amber-50 rounded-xl border border-amber-100 flex flex-col items-start gap-4">

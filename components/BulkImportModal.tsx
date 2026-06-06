@@ -78,7 +78,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ title, fields, onImpo
   };
 
   const checkDuplicateInSystem = (fieldKey: string, value: any) => {
-    if (!value || title !== 'Formandos') return false;
+    if (!value || title !== 'Clientes') return false;
     const valStr = String(value).toLowerCase().trim();
     
     if (fieldKey === 'email') return clients.some(c => c.email.toLowerCase().trim() === valStr);

@@ -33,19 +33,19 @@ const Sidebar: React.FC = () => {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
-    { path: '/funil', label: 'Funil de Vendas', icon: Funnel, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
+    { path: '/funil', label: 'Negociações', icon: Funnel, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
     { path: '/clientes', label: 'Clientes', icon: Users, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
-    { path: '/acoes-cs', label: 'Ações do CS', icon: Zap, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
+    { path: '/acoes-cs', label: 'Painel de Ações CS', icon: Zap, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
     { path: '/atendimentos-cs', label: 'Atendimentos Diários CS', icon: Headset, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
-    { path: '/agenda', label: 'Agenda', icon: Calendar, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
+    { path: '/agenda', label: 'Agenda Integrada', icon: Calendar, roles: [UserRole.ADMIN, UserRole.CONSULTOR, UserRole.VISUALIZADOR] },
   ];
 
   const adminItems = [
     { path: '/admin/instituicoes', label: 'Instituições', icon: Building2 },
     { path: '/admin/cursos', label: 'Cursos', icon: BookOpen },
-    { path: '/admin/produtos', label: 'Produtos', icon: Package },
-    { path: '/admin/turmas', label: 'Turmas', icon: GraduationCap },
-    { path: '/admin/eventos', label: 'Eventos', icon: Calendar },
+    { path: '/admin/produtos', label: 'Catálogo de Vendas', icon: Package },
+    { path: '/admin/turmas', label: 'Gestão de Turmas', icon: GraduationCap },
+    { path: '/admin/eventos', label: 'Cronograma Mestre', icon: Calendar },
     { path: '/admin/usuarios', label: 'Usuários', icon: UserCircle2 },
     { path: '/admin/funis', label: 'Config. Funil', icon: Funnel },
     { path: '/admin/lixeira',   label: 'Lixeira', icon: Trash2 },

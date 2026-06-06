@@ -40,7 +40,7 @@ const ExportSelectionModal: React.FC<{
             <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="p-8 border-b border-slate-100 flex items-center justify-between">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Exportar Base de Formandos</h3>
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Exportar Base de Clientes</h3>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Selecione as turmas para o filtro do arquivo XLS</p>
                     </div>
                     <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-900 transition-all"><X size={32} /></button>
@@ -261,7 +261,7 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Dados Acadêmicos</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Turma (Filtro Mestre)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Turma / Sala</label>
                 <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" value={formData.classId || ''} onChange={e => handleClassChange(e.target.value)}>
                    <option value="">Selecionar Turma...</option>
                    {classOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -477,7 +477,7 @@ const ClientsView: React.FC = () => {
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Base_Formandos");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Base_Clientes");
     XLSX.writeFile(workbook, `export_clientes_${new Date().toISOString().split('T')[0]}.xlsx`);
     setIsExportModalOpen(false);
   };
@@ -505,7 +505,7 @@ const ClientsView: React.FC = () => {
     <div className="h-full flex gap-6 overflow-hidden">
       <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedClientId ? 'w-1/2' : 'w-full'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Banco de Formandos</h1><p className="text-slate-500 font-medium">Gestão centralizada da sua base mestre de leads.</p></div>
+          <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Clientes</h1><p className="text-slate-500 font-medium">Gestão centralizada da sua base mestre de leads.</p></div>
           <div className="flex items-center gap-3">
             {!isVisualizador && (
               <>
@@ -629,7 +629,7 @@ const ClientsView: React.FC = () => {
       
       {isImportModalOpen && (
         <BulkImportModal 
-          title="Formandos" 
+          title="Clientes"
           fields={importFields} 
           onClose={() => setIsImportModalOpen(false)} 
           onImport={handleBulkImport} 

@@ -175,7 +175,7 @@ const Dashboard: React.FC = () => {
         <StatCard title="Em Fluxo" value={dashboardData.negAndamento} icon={Clock} colorClass="text-amber-500" bgColorClass="bg-amber-50" />
         <StatCard title="Ganhos (Won)" value={dashboardData.negGanhas} icon={CheckCircle2} colorClass="text-emerald-600" bgColorClass="bg-emerald-50" />
         <StatCard title="Perdas (Lost)" value={dashboardData.negPerdidas} icon={XCircle} colorClass="text-rose-500" bgColorClass="bg-rose-50" />
-        <StatCard title="Conversão" value={parseFloat(dashboardData.conversion)} suffix="%" icon={TrendingUp} colorClass="text-blue-500" bgColorClass="bg-blue-50" />
+        <StatCard title="Conversão" value={parseFloat(dashboardData.conversion)} suffix="%" icon={TrendingUp} colorClass="text-amber-500" bgColorClass="bg-amber-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -201,7 +201,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm min-h-[450px] flex flex-col">
-          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><Activity size={20} /></div><div><h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Status da Base</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribuição por período</p></div></div>
+          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center"><Activity size={20} /></div><div><h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Status da Base</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribuição por período</p></div></div>
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyStatusData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10, fontWeight: 800}}/><YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}}/>
