@@ -188,12 +188,43 @@ const ServiceModal: React.FC<{
 };
 
 const CSDailyServicesView: React.FC = () => {
-  const { csDailyServices, clients, classes, users, moveToTrash } = useData();
+  const { csDailyServices, clients, classes, users, moveToTrash, addCSDailyService, currentUser } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<CSDailyService | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  const handleBulkImport = (data: any[]) => {
+    const today = new Date().toISOString().split('T')[0];
+    data.forEach(item => {
+      if (!item.clientPhone) return; // telefone é obrigatório
+      const service: CSDailyService = {
+        id:                crypto.randomUUID(),
+        date:              item.date || today,
+        type:              item.type || 'WhatsApp',
+        clientPhone:       item.clientPhone,
+        clientNameManual:  item.clientNameManual || '',
+        clientId:          clients.find(c => c.phone === item.clientPhone)?.id || '',
+        summary:           item.summary || '',
+        status:            item.status || 'Concluído',
+        responsibleUserId: item.responsibleUserId || currentUser?.id || '',
+        createdAt:         today,
+      };
+      addCSDailyService(service);
+    });
+  };
+
+  const importFields = [
+    { key: 'date',              label: 'Data (AAAA-MM-DD)',           required: true },
+    { key: 'type',              label: 'Meio de Contato',             required: true },
+    { key: 'clientPhone',       label: 'Telefone do Contato',         required: true },
+    { key: 'clientNameManual',  label: 'Nome Manual (opcional)' },
+    { key: 'summary',           label: 'Resumo',                      required: true },
+    { key: 'status',            label: 'Status' },
+    { key: 'responsibleUserId', label: 'ID do Responsável (opcional)' },
+  ];
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -255,6 +286,9 @@ const CSDailyServicesView: React.FC = () => {
         <div className="flex items-center gap-3">
           <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
             <Download size={18} /> Relatório de Atendimentos
+          </button>
+          <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all">
+            <FileSpreadsheet size={18} /> Importar Planilha
           </button>
           <button onClick={() => { setServiceToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:scale-105 transition-all">
             <Plus size={18} /> Novo Atendimento
@@ -376,6 +410,15 @@ const CSDailyServicesView: React.FC = () => {
       )}
 
       {isModalOpen && <ServiceModal serviceToEdit={serviceToEdit} onClose={() => setIsModalOpen(false)} />}
+
+      {isImportModalOpen && (
+        <BulkImportModal
+          title="Atendimentos Diários CS"
+          fields={importFields}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleBulkImport}
+        />
+      )}
 
       {confirmConfig && (
         <ConfirmModal

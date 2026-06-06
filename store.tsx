@@ -885,8 +885,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           break;
         case 'client':
           if (tenantId) {
-            supabase.from('clients').insert(clientPayload(restoredData as Client, tenantId))
-              .then(({ error }) => { if (error) console.error('restore client:', error.message); });
+            // upsert em vez de insert: contorna UNIQUE (tenant_id, email) e garante idempotência
+            supabase.from('clients')
+              .upsert(clientPayload(restoredData as Client, tenantId), { onConflict: 'id' })
+              .then(async ({ error }) => {
+                if (error) { console.error('restore client:', error.message); return; }
+                // Re-inserir atividades (deletadas em cascade no Supabase)
+                const activities = (restoredData as Client).activities ?? [];
+                if (activities.length > 0 && tenantId) {
+                  await supabase.from('client_activities').upsert(
+                    activities.map((a: any) => ({
+                      id:          a.id,
+                      tenant_id:   tenantId,
+                      client_id:   (restoredData as Client).id,
+                      type:        a.type,
+                      description: a.description ?? '',
+                      timestamp:   a.timestamp ?? new Date().toISOString(),
+                      attachments: a.attachments ?? [],
+                    })),
+                    { onConflict: 'id' }
+                  ).then(({ error: e }) => { if (e) console.error('restore client_activities:', e.message); });
+                }
+              });
           }
           setClients(p => [...p, restoredData]);
           break;

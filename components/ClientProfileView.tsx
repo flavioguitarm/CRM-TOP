@@ -79,14 +79,23 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
   const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
 
   const allowedClassProducts = useMemo(() => {
-    if (!clientClass) return [];
-    return clientClass.classProducts.map(cp => {
-      const baseInfo = products.find(p => p.id === cp.productId);
-      return {
-        ...cp,
-        name: baseInfo?.name || 'Produto Removido'
-      };
-    });
+    // Se a turma tem produtos configurados, usa eles (com preço/meta da turma)
+    if (clientClass && clientClass.classProducts?.length > 0) {
+      return clientClass.classProducts.map(cp => {
+        const baseInfo = products.find(p => p.id === cp.productId);
+        return {
+          ...cp,
+          name: baseInfo?.name || 'Produto Removido'
+        };
+      });
+    }
+    // Fallback: sem turma ou turma sem produtos → lista todos os produtos do catálogo
+    return products.map(p => ({
+      productId: p.id,
+      name: p.name,
+      customPrice: 0,
+      goalQuantity: 0,
+    }));
   }, [clientClass, products]);
 
   const clientSales = useMemo(() => sales.filter(s => s.clientId === client.id), [sales, client.id]);
