@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -111,6 +111,13 @@ interface DataContextType {
   exportAllData: () => Promise<string>;
   importAllData: (json: string) => Promise<void>;
   resetAllData: () => Promise<void>;
+  // ── Backup automático ───────────────────────────────────────────────────────
+  backupSettings: BackupSettings | null;
+  loadBackupSettings: () => Promise<void>;
+  saveBackupSettings: (patch: { enabled?: boolean; frequency?: 'daily' | 'weekly' }) => Promise<void>;
+  listBackups: () => Promise<BackupFile[]>;
+  triggerManualBackup: () => Promise<{ filename: string; sizeKb: number }>;
+  downloadBackupFile: (path: string, filename: string) => Promise<void>;
 }
 
 const STORAGE_KEY = 'crm_top_formaturas_v1_prod_v3';
@@ -2023,6 +2030,92 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.clear();
   };
 
+  // ── Backup automático ─────────────────────────────────────────────────────────
+
+  const [backupSettings, setBackupSettings] = useState<BackupSettings | null>(null);
+
+  const loadBackupSettings = async (): Promise<void> => {
+    if (!tenantId) return;
+    const { data } = await supabase
+      .from('backup_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (data) {
+      setBackupSettings({
+        id: data.id,
+        tenantId: data.tenant_id,
+        enabled: data.enabled,
+        frequency: data.frequency,
+        lastBackupAt: data.last_backup_at ?? null,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      });
+    }
+  };
+
+  const saveBackupSettings = async (patch: { enabled?: boolean; frequency?: 'daily' | 'weekly' }): Promise<void> => {
+    if (!tenantId) return;
+    const payload: Record<string, any> = { tenant_id: tenantId, ...patch };
+    const { data, error } = await supabase
+      .from('backup_settings')
+      .upsert(payload, { onConflict: 'tenant_id' })
+      .select()
+      .single();
+    if (error) throw new Error(`Erro ao salvar configurações de backup: ${error.message}`);
+    setBackupSettings({
+      id: data.id,
+      tenantId: data.tenant_id,
+      enabled: data.enabled,
+      frequency: data.frequency,
+      lastBackupAt: data.last_backup_at ?? null,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    });
+  };
+
+  const listBackups = async (): Promise<BackupFile[]> => {
+    if (!tenantId) return [];
+    const { data, error } = await supabase.storage
+      .from('backups')
+      .list(tenantId, { sortBy: { column: 'created_at', order: 'desc' }, limit: 50 });
+    if (error) throw new Error(`Erro ao listar backups: ${error.message}`);
+    return (data ?? []).map((f: any) => ({
+      name: f.name,
+      path: `${tenantId}/${f.name}`,
+      sizeKb: Math.round((f.metadata?.size ?? 0) / 1024),
+      createdAt: f.created_at ?? '',
+    }));
+  };
+
+  const triggerManualBackup = async (): Promise<{ filename: string; sizeKb: number }> => {
+    if (!tenantId) throw new Error('Usuário não autenticado.');
+    const { data, error } = await supabase.functions.invoke('auto-backup', {
+      body: { tenantId },
+    });
+    if (error) throw new Error(`Erro ao acionar backup: ${error.message}`);
+    if (data?.error) throw new Error(data.error);
+    // Atualiza last_backup_at local
+    setBackupSettings(prev => prev
+      ? { ...prev, lastBackupAt: data.exportedAt ?? new Date().toISOString() }
+      : prev
+    );
+    return { filename: data.filename, sizeKb: data.sizeKb };
+  };
+
+  const downloadBackupFile = async (path: string, filename: string): Promise<void> => {
+    const { data, error } = await supabase.storage.from('backups').download(path);
+    if (error) throw new Error(`Erro ao baixar backup: ${error.message}`);
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <DataContext.Provider value={{
       currentUser, setCurrentUser, sidebarCollapsed, setSidebarCollapsed,
@@ -2049,6 +2142,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
       resetDatabase, exportDatabase, importDatabase,
       exportAllData, importAllData, resetAllData,
+      backupSettings, loadBackupSettings, saveBackupSettings,
+      listBackups, triggerManualBackup, downloadBackupFile,
     }}>
       {children}
     </DataContext.Provider>

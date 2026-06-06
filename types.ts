@@ -1,4 +1,21 @@
 
+export interface BackupSettings {
+  id: string;
+  tenantId: string;
+  enabled: boolean;
+  frequency: 'daily' | 'weekly';
+  lastBackupAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BackupFile {
+  name: string;
+  path: string;
+  sizeKb: number;
+  createdAt: string;
+}
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   CONSULTOR = 'CONSULTOR',

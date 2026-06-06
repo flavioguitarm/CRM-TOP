@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-06 (Sessão 6 — encerrada)
+> Atualizado em: 2026-06-06 (Sessão 7 — em andamento)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -375,13 +375,63 @@ ALTER TABLE class_products
 
 ---
 
-## 🗺️ Próximos passos (Sessão 7+)
+---
 
-### 1. Backups automáticos agendados
-- Exportação periódica do banco via Supabase Edge Function ou cron job externo
-- Opções: diário/semanal, envio por e-mail ou armazenamento em Supabase Storage
+## ✅ Sessão 7 — Backups Automáticos (2026-06-06)
 
-### 2. Níveis de acesso por hierarquia (Admin / Gestor / Consultor / Visualizador)
+### Edge Function `auto-backup` (`supabase/functions/auto-backup/index.ts`)
+- Recebe `{ tenantId }` via POST
+- Busca todos os dados do tenant (mesma lógica de `exportAllData`)
+- Salva no bucket `backups` como `{tenantId}/backup_YYYY-MM-DD_HH-mm.json`
+- Mantém apenas os últimos 30 backups (deleta os mais antigos automaticamente)
+- Atualiza `backup_settings.last_backup_at` após cada backup
+
+### Tabela `backup_settings` (criada manualmente no Supabase)
+```sql
+CREATE TABLE backup_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL UNIQUE,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  frequency TEXT NOT NULL DEFAULT 'daily' CHECK (frequency IN ('daily', 'weekly')),
+  last_backup_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Tipos adicionados em `types.ts`
+- `BackupSettings` — configurações de backup do tenant
+- `BackupFile` — arquivo listado do Storage
+
+### Funções adicionadas em `store.tsx`
+- `backupSettings: BackupSettings | null` — estado reativo das configs
+- `loadBackupSettings()` — carrega do Supabase
+- `saveBackupSettings({ enabled?, frequency? })` — upsert no Supabase
+- `listBackups()` — lista arquivos do bucket `backups/{tenantId}`
+- `triggerManualBackup()` — invoca Edge Function `auto-backup`
+- `downloadBackupFile(path, filename)` — baixa arquivo do Storage
+
+### Seção "Backups Automáticos" em `Database.tsx`
+- Toggle ativar/desativar backup automático (salva em `backup_settings`)
+- Seletor de frequência: Diário / Semanal
+- Botão "Fazer Backup Agora" (chama `triggerManualBackup`)
+- Lista de backups salvos no Storage com data, tamanho e botão de download
+- Estado do último backup (`last_backup_at`)
+
+### Deploy da Edge Function (necessário fazer no Supabase)
+```bash
+supabase functions deploy auto-backup
+```
+A função usa `SUPABASE_SERVICE_ROLE_KEY` (variável automática no ambiente da Edge Function).
+
+### Bucket `backups` no Supabase Storage
+- Criado manualmente (privado) — arquivos acessíveis apenas via SDK autenticado.
+
+---
+
+## 🗺️ Próximos passos (Sessão 8+)
+
+### 1. Níveis de acesso por hierarquia (Admin / Gestor / Consultor / Visualizador)
 - Revisão das permissões por `UserRole` em todas as páginas
 - Criar nível `GESTOR` com acesso intermediário (entre Admin e Consultor)
 - Ocultar/desabilitar ações destrutivas para Visualizador e Consultor

@@ -1,12 +1,14 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useData } from '../../store';
 import { supabase } from '../../src/lib/supabase';
+import { BackupFile } from '../../types';
 import {
   Download, Upload, AlertTriangle, CheckCircle2,
   Loader2, Database, FileJson, ShieldCheck,
   RefreshCcw, X, ChevronRight, Info,
-  Trash2, Share2, HardDriveDownload,
+  Trash2, Share2, HardDriveDownload, Clock, CalendarClock,
+  ToggleLeft, ToggleRight, ListOrdered,
 } from 'lucide-react';
 
 // ─── Labels amigáveis para cada tabela ───────────────────────────────────────
@@ -74,10 +76,83 @@ const DatabaseAdmin: React.FC = () => {
     exportAllData, importAllData, resetAllData,
     googleSheetUrl, setGoogleSheetUrl, syncWithGoogleSheet,
     users,
+    backupSettings, loadBackupSettings, saveBackupSettings,
+    listBackups, triggerManualBackup, downloadBackupFile,
   } = useData();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // ── Backup automático ───────────────────────────────────────────────────────
+  const [backupFiles, setBackupFiles] = useState<BackupFile[]>([]);
+  const [backupListLoading, setBackupListLoading] = useState(false);
+  const [manualBackupLoading, setManualBackupLoading] = useState(false);
+  const [manualBackupResult, setManualBackupResult] = useState<{ filename: string; sizeKb: number } | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const refreshBackupList = useCallback(async () => {
+    setBackupListLoading(true);
+    setBackupError(null);
+    try {
+      const files = await listBackups();
+      setBackupFiles(files);
+    } catch (e: any) {
+      setBackupError(e.message);
+    } finally {
+      setBackupListLoading(false);
+    }
+  }, [listBackups]);
+
+  useEffect(() => {
+    loadBackupSettings();
+    refreshBackupList();
+  }, []);
+
+  const handleToggleEnabled = async () => {
+    setSavingSettings(true);
+    try {
+      await saveBackupSettings({ enabled: !(backupSettings?.enabled ?? false) });
+    } catch (e: any) {
+      setBackupError(e.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleFrequencyChange = async (freq: 'daily' | 'weekly') => {
+    setSavingSettings(true);
+    try {
+      await saveBackupSettings({ frequency: freq });
+    } catch (e: any) {
+      setBackupError(e.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleManualBackup = async () => {
+    setManualBackupLoading(true);
+    setManualBackupResult(null);
+    setBackupError(null);
+    try {
+      const result = await triggerManualBackup();
+      setManualBackupResult(result);
+      await refreshBackupList();
+    } catch (e: any) {
+      setBackupError(e.message);
+    } finally {
+      setManualBackupLoading(false);
+    }
+  };
+
+  const handleDownload = async (path: string, filename: string) => {
+    try {
+      await downloadBackupFile(path, filename);
+    } catch (e: any) {
+      setBackupError(e.message);
+    }
+  };
 
   // ── Export ──────────────────────────────────────────────────────────────────
   const [exportPhase, setExportPhase] = useState<ExportPhase>('idle');
@@ -493,6 +568,193 @@ const DatabaseAdmin: React.FC = () => {
                 <button onClick={resetImport} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2">
                   <RefreshCcw size={14} /> Tentar novamente
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Backups Automáticos ──────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-5 flex items-center gap-2">
+          <CalendarClock size={14} /> Backups Automáticos
+        </h2>
+
+        <div className="space-y-6">
+
+          {/* Card de configuração */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10 hover:border-amber-300 transition-all">
+            <div className="flex items-start gap-4 mb-8">
+              <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 shrink-0">
+                <CalendarClock size={28} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Agendamento de Backup</h3>
+                <p className="text-sm text-slate-500 font-medium mt-1">
+                  O sistema salva automaticamente um snapshot completo no Supabase Storage. Mantém os últimos 30 backups.
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle ativo/inativo */}
+            <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 mb-5">
+              <div>
+                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Backup Automático</p>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  {backupSettings?.enabled ? 'Ativado — backups serão gerados conforme agendado.' : 'Desativado — nenhum backup automático será gerado.'}
+                </p>
+              </div>
+              <button
+                onClick={handleToggleEnabled}
+                disabled={savingSettings}
+                className="flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                {savingSettings ? (
+                  <Loader2 size={32} className="animate-spin text-amber-500" />
+                ) : backupSettings?.enabled ? (
+                  <ToggleRight size={44} className="text-amber-500" />
+                ) : (
+                  <ToggleLeft size={44} className="text-slate-300" />
+                )}
+              </button>
+            </div>
+
+            {/* Frequência */}
+            <div className="mb-6">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Frequência</p>
+              <div className="flex gap-3">
+                {(['daily', 'weekly'] as const).map(freq => {
+                  const active = (backupSettings?.frequency ?? 'daily') === freq;
+                  const labels = { daily: 'Diário', weekly: 'Semanal' };
+                  return (
+                    <button
+                      key={freq}
+                      onClick={() => handleFrequencyChange(freq)}
+                      disabled={savingSettings}
+                      className={`flex-1 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all border-2 disabled:opacity-50 ${
+                        active
+                          ? 'bg-slate-900 border-slate-900 text-white shadow-lg'
+                          : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                      }`}
+                    >
+                      {labels[freq]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Último backup */}
+            {backupSettings?.lastBackupAt && (
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-6">
+                <Clock size={13} className="text-emerald-500" />
+                Último backup: {new Date(backupSettings.lastBackupAt).toLocaleString('pt-BR')}
+              </div>
+            )}
+
+            {/* Feedback de backup manual */}
+            {manualBackupResult && (
+              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4">
+                <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-black text-emerald-700 uppercase tracking-tight">Backup gerado com sucesso!</p>
+                  <p className="text-[10px] font-mono text-emerald-600 mt-0.5">{manualBackupResult.filename} — {manualBackupResult.sizeKb} KB</p>
+                </div>
+              </div>
+            )}
+
+            {backupError && (
+              <div className="flex items-start gap-2.5 bg-rose-50 border border-rose-100 rounded-2xl p-4 mb-4">
+                <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold text-rose-700">{backupError}</p>
+              </div>
+            )}
+
+            {/* Botão backup agora */}
+            <button
+              onClick={handleManualBackup}
+              disabled={manualBackupLoading}
+              className="w-full bg-slate-900 hover:bg-amber-500 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-5 rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl transition-all flex items-center justify-center gap-3"
+            >
+              {manualBackupLoading ? (
+                <><Loader2 size={18} className="animate-spin" /> Gerando backup…</>
+              ) : (
+                <><HardDriveDownload size={18} /> Fazer Backup Agora</>
+              )}
+            </button>
+          </div>
+
+          {/* Lista de backups no Storage */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 shrink-0">
+                  <ListOrdered size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Backups Salvos</h3>
+                  <p className="text-sm text-slate-500 font-medium mt-1">
+                    Backups armazenados no Supabase Storage. Máximo de 30 — os mais antigos são removidos automaticamente.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={refreshBackupList}
+                disabled={backupListLoading}
+                className="p-3 rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all disabled:opacity-50"
+                title="Atualizar lista"
+              >
+                <RefreshCcw size={16} className={`text-slate-400 ${backupListLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {backupListLoading ? (
+              <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
+                <Loader2 size={20} className="animate-spin" />
+                <span className="text-xs font-bold uppercase tracking-widest">Carregando backups…</span>
+              </div>
+            ) : backupFiles.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <HardDriveDownload size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-xs font-bold uppercase tracking-widest">Nenhum backup encontrado.</p>
+                <p className="text-[10px] font-medium mt-1">Clique em "Fazer Backup Agora" para criar o primeiro.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {backupFiles.map((file, idx) => (
+                  <div
+                    key={file.path}
+                    className="flex items-center justify-between px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileJson size={16} className="text-amber-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-tight truncate">{file.name}</p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          {file.createdAt ? new Date(file.createdAt).toLocaleString('pt-BR') : '—'}
+                          {file.sizeKb > 0 && <> &nbsp;·&nbsp; {file.sizeKb} KB</>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      {idx === 0 && (
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg">
+                          Mais recente
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDownload(file.path, file.name)}
+                        className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:text-amber-500 text-slate-400 transition-all"
+                        title="Baixar backup"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right pt-2">
+                  {backupFiles.length} backup{backupFiles.length !== 1 ? 's' : ''} armazenado{backupFiles.length !== 1 ? 's' : ''}
+                </p>
               </div>
             )}
           </div>
