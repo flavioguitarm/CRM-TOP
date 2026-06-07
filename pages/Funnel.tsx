@@ -9,9 +9,10 @@ import {
   Target, ListTodo, Clock, Trash2, CheckSquare, Square, Filter,
   MousePointer2, Move, CreditCard, BookOpen, MapPin, Hash
 } from 'lucide-react';
-import { UserRole, Client, Activity, Task, Campus, FunnelStage } from '../types';
+import { Client, Activity, Task, Campus, FunnelStage } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
 import ConfirmModal from '../components/ConfirmModal';
+import { usePermissions } from '../src/hooks/usePermissions';
 
 // --- Componente de Select com Busca para o Modal ---
 const SearchableSelect: React.FC<{ 
@@ -434,7 +435,7 @@ const FunnelView: React.FC = () => {
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const currentFunnel = funnels.find(f => f.id === selectedFunnelId);
-  const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
+  const perms = usePermissions('funil');
 
   const filteredClients = useMemo(() => {
     return clients.filter(c => 
@@ -491,13 +492,13 @@ const FunnelView: React.FC = () => {
           <p className="text-slate-500 font-medium mt-1">Gestão tática do fluxo de conversão.</p>
         </div>
         <div className="flex items-center gap-3">
-          {selectedDealIds.size > 0 && !isVisualizador && (
+          {selectedDealIds.size > 0 && perms.canDelete && (
              <button onClick={() => { const ids = Array.from(selectedDealIds); setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} negociação(ões) para a Lixeira?`, onConfirm: () => { moveToTrash('client', ids); setSelectedDealIds(new Set()); setConfirmConfig(null); } }); }} className="flex items-center gap-2 bg-rose-500 px-6 py-3 rounded-2xl text-white hover:bg-rose-600 transition-all font-black text-xs uppercase tracking-widest shadow-xl">
                 <Trash2 size={18} /> Excluir ({selectedDealIds.size})
              </button>
           )}
           <button onClick={() => setMoveBulkOpen(true)} className="flex items-center gap-2 bg-slate-900 px-6 py-3 rounded-2xl text-white hover:bg-slate-800 transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-slate-200"><ArrowRightLeft size={18} /> Mover em Lote</button>
-          {!isVisualizador && (
+          {perms.canInsert && (
             <button onClick={() => setIsNewLeadModalOpen(true)} className="flex items-center gap-2 bg-amber-500 px-6 py-3 rounded-2xl text-white hover:bg-amber-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-amber-500/30">
               <Plus size={18} /> Novo Lead
             </button>
@@ -553,7 +554,7 @@ const FunnelView: React.FC = () => {
                     return (
                       <div 
                         key={client.id} 
-                        draggable={!isVisualizador}
+                        draggable={perms.canEdit}
                         onDragStart={(e) => onDragStart(e, client.id)}
                         onClick={() => setSelectedClientId(client.id)}
                         className={`bg-white p-6 rounded-[2rem] border-2 transition-all cursor-grab active:cursor-grabbing relative group ${isChecked ? 'border-amber-500 shadow-xl scale-[0.98]' : 'border-white hover:border-amber-300 shadow-sm'}`}
@@ -585,7 +586,7 @@ const FunnelView: React.FC = () => {
                                <span className="text-[10px] font-black text-slate-900 uppercase">R$ {client.totalValue.toLocaleString()}</span>
                             </div>
                             
-                            {!isVisualizador && stage.type === 'NORMAL' && (
+                            {perms.canEdit && stage.type === 'NORMAL' && (
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                                   <button onClick={(e) => { e.stopPropagation(); handleWinQuick(client); }} className="p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100" title="Venda (Mover para Won)"><CreditCard size={14}/></button>
                                   <button onClick={(e) => { e.stopPropagation(); handleLoseQuick(client); }} className="p-2 bg-rose-500 text-white rounded-xl hover:bg-rose-600 shadow-lg shadow-rose-100" title="Perda (Mover para Lost)"><Trash2 size={14}/></button>

@@ -4,11 +4,12 @@ import { useData } from '../store';
 import {
   Plus, Search, FileUp, MoreHorizontal, X, User, Mail, Phone, GraduationCap, Building2, AlertCircle, ChevronDown, Edit3, Filter, Tags, FileSpreadsheet, Calendar, Download, Check, Trash2, CheckSquare, Square
 } from 'lucide-react';
-import { Client, UserRole, ClassRoom, Campus, Sale, ProductNegotiation } from '../types';
+import { Client, ClassRoom, Campus, Sale, ProductNegotiation } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import HelpTooltip from '../components/HelpTooltip';
+import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
 // --- Modal de Seleção de Turmas para Exportação ---
@@ -341,7 +342,7 @@ const ClientsView: React.FC = () => {
     setConfirmConfig({ title: 'Mover para Lixeira', message: `Deseja mover ${ids.length} cliente(s) para a Lixeira?`, onConfirm: () => { if (selectedIds.has(selectedClientId || '')) setSelectedClientId(null); moveToTrash('client', ids); setSelectedIds(new Set()); setConfirmConfig(null); } });
   };
 
-  const isVisualizador = currentUser?.role === UserRole.VISUALIZADOR;
+  const perms = usePermissions('clientes');
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -562,7 +563,7 @@ const ClientsView: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Clientes</h1><p className="text-slate-500 font-medium">Gestão centralizada da sua base mestre de leads.</p></div>
           <div className="flex items-center gap-3">
-            {!isVisualizador && (
+            {perms.canInsert && (
               <>
                 <button onClick={() => setIsExportModalOpen(true)} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
                   <Download size={18} /> Exportar Base (XLS)
@@ -635,8 +636,8 @@ const ClientsView: React.FC = () => {
                     <td className="px-8 py-5"><div className="flex flex-wrap gap-1.5">{client.tags.map(tag => (<span key={tag} className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-slate-900 text-white uppercase tracking-tighter shadow-sm">{tag}</span>))}</div></td>
                     <td className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={(e) => { e.stopPropagation(); setClientToEdit(client); setIsModalOpen(true); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Editar"><MoreHorizontal size={20} className="text-slate-400 hover:text-amber-500"/></button>
-                        <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${client.name}" para a Lixeira?`, onConfirm: () => { if (selectedClientId === client.id) setSelectedClientId(null); moveToTrash('client', [client.id]); setConfirmConfig(null); } }); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Mover para Lixeira"><Trash2 size={18} className="text-slate-400 hover:text-rose-500"/></button>
+                        {perms.canEdit && <button onClick={(e) => { e.stopPropagation(); setClientToEdit(client); setIsModalOpen(true); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Editar"><MoreHorizontal size={20} className="text-slate-400 hover:text-amber-500"/></button>}
+                        {perms.canDelete && <button onClick={(e) => { e.stopPropagation(); setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${client.name}" para a Lixeira?`, onConfirm: () => { if (selectedClientId === client.id) setSelectedClientId(null); moveToTrash('client', [client.id]); setConfirmConfig(null); } }); }} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm" title="Mover para Lixeira"><Trash2 size={18} className="text-slate-400 hover:text-rose-500"/></button>}
                       </div>
                     </td>
                   </tr>
@@ -654,13 +655,15 @@ const ClientsView: React.FC = () => {
               <User size={28} className="text-amber-500" /> Perfil do Cliente
             </h2>
             <div className="flex items-center gap-2">
-              <button 
-                onClick={handleEditFromProfile}
-                className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
-                title="Editar Perfil"
-              >
-                <Edit3 size={24} />
-              </button>
+              {perms.canEdit && (
+                <button
+                  onClick={handleEditFromProfile}
+                  className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                  title="Editar Perfil"
+                >
+                  <Edit3 size={24} />
+                </button>
+              )}
               <button onClick={() => setSelectedClientId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
             </div>
           </div>
@@ -670,7 +673,7 @@ const ClientsView: React.FC = () => {
         </div>
       )}
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && perms.canDelete && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl">
           <span className="text-sm font-black">{selectedIds.size} selecionado(s)</span>
           <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-black px-4 py-2 rounded-xl transition-all">

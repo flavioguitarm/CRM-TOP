@@ -18,6 +18,7 @@ export interface BackupFile {
 
 export enum UserRole {
   ADMIN = 'ADMIN',
+  GESTOR = 'GESTOR',
   CONSULTOR = 'CONSULTOR',
   VISUALIZADOR = 'VISUALIZADOR'
 }

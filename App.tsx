@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider, useData } from './store';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
+import { canAccessModule, AppModule } from './src/hooks/usePermissions';
+import { UserRole } from './types';
 import { supabase } from './src/lib/supabase';
 import LoginPage from './src/components/Auth/LoginPage';
 import ForgotPasswordPage from './src/components/Auth/ForgotPasswordPage';
@@ -111,6 +113,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+// ─── Guard de rota por módulo/role ───────────────────────────────────────────
+
+const RoleGuard: React.FC<{ module: AppModule; children: React.ReactNode }> = ({ module, children }) => {
+  const { currentUser } = useData();
+  const role = currentUser?.role as UserRole | undefined;
+  if (!canAccessModule(role, module)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 // ─── Layout principal (apenas para rotas protegidas) ─────────────────────────
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -139,24 +152,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const AppRoutes: React.FC = () => (
   <Routes>
-    <Route path="/"                      element={<Dashboard />} />
-    <Route path="/funil"                 element={<FunnelView />} />
-    <Route path="/clientes"              element={<ClientsView />} />
-    <Route path="/acoes-cs"              element={<CSActionsView />} />
-    <Route path="/atendimentos-cs"       element={<CSDailyServicesView />} />
-    <Route path="/agenda"                element={<AgendaView />} />
-    <Route path="/admin/turmas"          element={<TurmasAdmin />} />
-    <Route path="/admin/usuarios"        element={<UsersAdmin />} />
-    <Route path="/admin/funis"           element={<FunnelConfig />} />
-    <Route path="/admin/instituicoes"    element={<InstituicoesAdmin />} />
-    <Route path="/admin/cursos"          element={<CursosAdmin />} />
-    <Route path="/admin/produtos"        element={<ProdutosAdmin />} />
-    <Route path="/admin/eventos"         element={<EventosAdmin />} />
-    <Route path="/admin/tipos-atividade" element={<ActivityTypesAdmin />} />
-    <Route path="/admin/seguranca"       element={<DatabaseAdmin />} />
-    <Route path="/admin/lixeira"         element={<TrashPage />} />
-    <Route path="/admin/*"               element={<Navigate to="/" replace />} />
-    <Route path="/perfil"                element={<UserProfile />} />
+    {/* Operação — todos os roles autenticados */}
+    <Route path="/"              element={<RoleGuard module="dashboard">      <Dashboard />           </RoleGuard>} />
+    <Route path="/funil"         element={<RoleGuard module="funil">          <FunnelView />          </RoleGuard>} />
+    <Route path="/clientes"      element={<RoleGuard module="clientes">       <ClientsView />         </RoleGuard>} />
+    <Route path="/acoes-cs"      element={<RoleGuard module="acoesCs">        <CSActionsView />       </RoleGuard>} />
+    <Route path="/atendimentos-cs" element={<RoleGuard module="atendimentosCs"><CSDailyServicesView /></RoleGuard>} />
+    <Route path="/agenda"        element={<RoleGuard module="agenda">         <AgendaView />          </RoleGuard>} />
+
+    {/* Cadastro Geral — ADMIN + GESTOR */}
+    <Route path="/admin/turmas"          element={<RoleGuard module="turmas">       <TurmasAdmin />       </RoleGuard>} />
+    <Route path="/admin/funis"           element={<RoleGuard module="funis">        <FunnelConfig />      </RoleGuard>} />
+    <Route path="/admin/instituicoes"    element={<RoleGuard module="instituicoes"> <InstituicoesAdmin /> </RoleGuard>} />
+    <Route path="/admin/cursos"          element={<RoleGuard module="cursos">       <CursosAdmin />       </RoleGuard>} />
+    <Route path="/admin/produtos"        element={<RoleGuard module="produtos">     <ProdutosAdmin />     </RoleGuard>} />
+    <Route path="/admin/eventos"         element={<RoleGuard module="eventos">      <EventosAdmin />      </RoleGuard>} />
+    <Route path="/admin/tipos-atividade" element={<RoleGuard module="activityTypes"><ActivityTypesAdmin /></RoleGuard>} />
+    <Route path="/admin/lixeira"         element={<RoleGuard module="lixeira">      <TrashPage />         </RoleGuard>} />
+
+    {/* Restritos — ADMIN apenas */}
+    <Route path="/admin/usuarios"  element={<RoleGuard module="usuarios"> <UsersAdmin />   </RoleGuard>} />
+    <Route path="/admin/seguranca" element={<RoleGuard module="database"> <DatabaseAdmin /> </RoleGuard>} />
+
+    {/* Fallbacks */}
+    <Route path="/admin/*" element={<Navigate to="/" replace />} />
+    <Route path="/perfil"  element={<UserProfile />} />
   </Routes>
 );
 

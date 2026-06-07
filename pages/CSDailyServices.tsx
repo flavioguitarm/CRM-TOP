@@ -8,9 +8,10 @@ import {
   Clock, Download, FileSpreadsheet, Check, UserPlus,
   AlertCircle, CheckSquare, Square
 } from 'lucide-react';
-import { CSDailyService, UserRole, Client } from '../types';
+import { CSDailyService, Client } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
+import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
 const ServiceModal: React.FC<{
@@ -189,6 +190,7 @@ const ServiceModal: React.FC<{
 
 const CSDailyServicesView: React.FC = () => {
   const { csDailyServices, clients, classes, users, moveToTrash, addCSDailyService, currentUser } = useData();
+  const perms = usePermissions('atendimentosCs');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -287,12 +289,16 @@ const CSDailyServicesView: React.FC = () => {
           <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
             <Download size={18} /> Relatório de Atendimentos
           </button>
-          <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all">
-            <FileSpreadsheet size={18} /> Importar Planilha
-          </button>
-          <button onClick={() => { setServiceToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:scale-105 transition-all">
-            <Plus size={18} /> Novo Atendimento
-          </button>
+          {perms.canInsert && (
+            <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all">
+              <FileSpreadsheet size={18} /> Importar Planilha
+            </button>
+          )}
+          {perms.canInsert && (
+            <button onClick={() => { setServiceToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:scale-105 transition-all">
+              <Plus size={18} /> Novo Atendimento
+            </button>
+          )}
         </div>
       </div>
 
@@ -377,8 +383,8 @@ const CSDailyServicesView: React.FC = () => {
                     </td>
                     <td className="px-8 py-5 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                          <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm"><Edit3 size={18}/></button>
-                          <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [service.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>
+                          {perms.canEdit && <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm"><Edit3 size={18}/></button>}
+                          {perms.canDelete && <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [service.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>}
                        </div>
                     </td>
                   </tr>
@@ -399,7 +405,7 @@ const CSDailyServicesView: React.FC = () => {
         </div>
       </div>
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && perms.canDelete && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl">
           <span className="text-sm font-black">{selectedIds.size} selecionado(s)</span>
           <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-black px-4 py-2 rounded-xl transition-all">

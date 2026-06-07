@@ -105,9 +105,10 @@ const UserModal: React.FC<{
                   value={formData.role}
                   onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                 >
-                  <option value={UserRole.ADMIN}>Administrador (Gerente)</option>
-                  <option value={UserRole.CONSULTOR}>Consultor</option>
-                  <option value={UserRole.VISUALIZADOR}>Visualizador (Diretoria)</option>
+                  <option value={UserRole.ADMIN}>Administrador — acesso total</option>
+                  <option value={UserRole.GESTOR}>Gestor — acesso total exceto Usuários e Database</option>
+                  <option value={UserRole.CONSULTOR}>Consultor — operação (sem excluir)</option>
+                  <option value={UserRole.VISUALIZADOR}>Visualizador — apenas leitura</option>
                 </select>
               </div>
             </div>
@@ -170,9 +171,10 @@ const UsersAdmin: React.FC = () => {
 
   const getRoleBadge = (role: UserRole) => {
     switch(role) {
-      case UserRole.ADMIN: return 'bg-slate-900 text-white';
-      case UserRole.CONSULTOR: return 'bg-amber-100 text-amber-700';
-      case UserRole.VISUALIZADOR: return 'bg-slate-100 text-slate-700';
+      case UserRole.ADMIN:       return 'bg-slate-900 text-white';
+      case UserRole.GESTOR:      return 'bg-emerald-100 text-emerald-700';
+      case UserRole.CONSULTOR:   return 'bg-amber-100 text-amber-700';
+      case UserRole.VISUALIZADOR:return 'bg-slate-100 text-slate-700';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -208,7 +210,7 @@ const UsersAdmin: React.FC = () => {
       accessor: (item: User) => (
         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${getRoleBadge(item.role)}`}>
           <Shield size={10} />
-          {item.role === UserRole.ADMIN ? 'Gerente' : item.role === UserRole.CONSULTOR ? 'Consultor' : 'Diretoria'}
+          {item.role === UserRole.ADMIN ? 'Admin' : item.role === UserRole.GESTOR ? 'Gestor' : item.role === UserRole.CONSULTOR ? 'Consultor' : 'Visualizador'}
         </span>
       )
     },

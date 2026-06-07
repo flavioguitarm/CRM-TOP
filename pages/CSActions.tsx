@@ -9,6 +9,7 @@ import {
 import { CSAction, CSActionActivity } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
+import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
 const CSActionModal: React.FC<{
@@ -227,6 +228,7 @@ const CSActionModal: React.FC<{
 
 const CSActionsView: React.FC = () => {
   const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users } = useData();
+  const perms = usePermissions('acoesCs');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -344,7 +346,7 @@ const CSActionsView: React.FC = () => {
             <p className="text-slate-500 font-medium">Monitoramento de engajamento e ROI das comunicações.</p>
           </div>
           <div className="flex items-center gap-3">
-             {selectedIds.size > 0 && (
+             {selectedIds.size > 0 && perms.canDelete && (
                 <button onClick={handleBulkDelete} className="bg-rose-50 border-2 border-rose-200 text-rose-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-rose-100 transition-all animate-in zoom-in-95">
                     <Trash2 size={18} /> Excluir ({selectedIds.size})
                 </button>
@@ -352,12 +354,16 @@ const CSActionsView: React.FC = () => {
              <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50">
                 <Download size={18} /> Exportar XLS
              </button>
-             <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800">
-                <FileSpreadsheet size={18} /> Importar Planilha
-             </button>
-            <button onClick={() => { setActionToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2">
-              <Plus size={18} /> Nova Operação
-            </button>
+             {perms.canInsert && (
+               <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800">
+                  <FileSpreadsheet size={18} /> Importar Planilha
+               </button>
+             )}
+            {perms.canInsert && (
+              <button onClick={() => { setActionToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2">
+                <Plus size={18} /> Nova Operação
+              </button>
+            )}
           </div>
         </div>
 
@@ -431,7 +437,7 @@ const CSActionsView: React.FC = () => {
               <Zap size={28} className="text-amber-500" /> Detalhes da Ação
             </h2>
             <div className="flex items-center gap-2">
-              <button onClick={() => { setActionToEdit(selectedAction); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>
+              {perms.canEdit && <button onClick={() => { setActionToEdit(selectedAction); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>}
               <button onClick={() => setSelectedActionId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
             </div>
           </div>
@@ -475,14 +481,14 @@ const CSActionsView: React.FC = () => {
                 </div>
              </section>
 
-             <div className="pt-6 border-t border-slate-100">
-                 <button 
+             {perms.canDelete && <div className="pt-6 border-t border-slate-100">
+                 <button
                     onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a ação "${selectedAction.title}" para a Lixeira?`, onConfirm: () => { moveToTrash('csAction', [selectedAction.id]); setSelectedActionId(null); setConfirmConfig(null); } })}
                     className="w-full py-5 border-2 border-rose-100 text-rose-500 rounded-3xl font-black uppercase tracking-widest hover:bg-rose-50 flex items-center justify-center gap-3"
                  >
                     <Trash2 size={18}/> Excluir Ação
                  </button>
-             </div>
+             </div>}
           </div>
         </div>
       )}

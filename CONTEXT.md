@@ -429,12 +429,66 @@ A função usa `SUPABASE_SERVICE_ROLE_KEY` (variável automática no ambiente da
 
 ---
 
+---
+
+## ✅ Sessão 7 (cont.) — Níveis de Acesso por Hierarquia
+
+### Novo role adicionado em `types.ts`
+```ts
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  GESTOR = 'GESTOR',       // ← NOVO
+  CONSULTOR = 'CONSULTOR',
+  VISUALIZADOR = 'VISUALIZADOR'
+}
+```
+
+### Hook `src/hooks/usePermissions.ts` *(novo)*
+- `usePermissions(module: AppModule): ModulePermissions` — retorna `{ canView, canInsert, canEdit, canDelete }`
+- `canAccessModule(role, module): boolean` — usado pelo `RoleGuard`
+- **Matriz de permissões:**
+
+| Módulo | ADMIN | GESTOR | CONSULTOR | VISUALIZADOR |
+|---|:---:|:---:|:---:|:---:|
+| Operação (dashboard, funil, clientes, acoesCs, atendimentosCs, agenda) | ✅✅✅✅ | ✅✅✅✅ | ✅✅✅❌ | ✅❌❌❌ |
+| Cadastro Geral (instituicoes, cursos, produtos, turmas, eventos, funis, activityTypes, lixeira) | ✅✅✅✅ | ✅✅✅✅ | ❌ | ❌ |
+| Sistema (usuarios, database) | ✅✅✅✅ | ❌ | ❌ | ❌ |
+
+*(V/I/E/D = canView/canInsert/canEdit/canDelete)*
+
+### `App.tsx` — `RoleGuard` em todas as rotas
+- Componente `<RoleGuard module="..." />` envolve cada `<Route>`
+- Redireciona para `/` se `!canView`
+- Rotas agrupadas: Operação / Cadastro Geral / Sistema
+
+### `Sidebar.tsx` — reescrito
+- 3 grupos de menu filtrados por role: **Operação**, **Cadastro Geral**, **Sistema**
+- Componentes `NavLink` e `SmallNavLink` (React.FC) para dois estilos
+- Badge de role no rodapé expandido (amber=Admin, emerald=Gestor, slate=Consultor/Visualizador)
+- GESTOR vê Cadastro Geral mas não vê seção Sistema
+
+### Páginas operacionais — permissões aplicadas
+| Página | canInsert | canEdit | canDelete |
+|---|---|---|---|
+| `Funnel.tsx` | Botão "Novo Lead" | draggable, ações de stage | bulk delete |
+| `Clients.tsx` | Exportar/Importar/Novo | Editar no painel lateral | Lixeira individual + bulk |
+| `CSActions.tsx` | Importar/Nova Operação | Editar no painel lateral | bulk delete + delete individual |
+| `CSDailyServices.tsx` | Importar/Novo Atendimento | Editar linha | Lixeira individual + bulk |
+| `Agenda.tsx` | (só leitura — sem CRUD próprio) | — | — |
+
+### `Admin/Users.tsx` — atualizado
+- Dropdown de roles: adicionado `GESTOR` com descrição clara
+- `getRoleBadge`: `GESTOR` → `emerald`
+- Label na tabela: "Gestor" ao lado de Admin/Consultor/Visualizador
+
+---
+
 ## 🗺️ Próximos passos (Sessão 8+)
 
-### 1. Níveis de acesso por hierarquia (Admin / Gestor / Consultor / Visualizador)
-- Revisão das permissões por `UserRole` em todas as páginas
-- Criar nível `GESTOR` com acesso intermediário (entre Admin e Consultor)
-- Ocultar/desabilitar ações destrutivas para Visualizador e Consultor
+### 1. Hardening de segurança (pré-lançamento)
+- Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
+- Auditar todas as queries para garantir `tenant_id` em todos os filtros
+- Remover dados de dev/seed do banco antes do go-live
 
 ### 3. Hardening de segurança (pré-lançamento)
 - Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
