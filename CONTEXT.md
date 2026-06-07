@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-06 (Sessão 8 — concluída)
+> Atualizado em: 2026-06-07 (Sessão 9 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -531,17 +531,122 @@ export enum UserRole {
 
 ---
 
-## 🗺️ Próximos passos (Sessão 9+)
+## ✅ Sessão 9 — Tipos de Demanda + Campos Completos em Atendimentos (2026-06-07)
 
-### 1. Melhorias CS
-- **Tipos de Demanda:** cadastro de tipos reutilizáveis para `CSActions` e `CSDailyServices`
-- **Campos adicionais em Atendimentos:** campos configuráveis por tipo de demanda
+### 🏷️ Nova entidade: `DemandType`
 
-### 2. Produtos por Turma — Nome do Plano + Tipo de Lote
+**`types.ts`:**
+```ts
+export interface DemandType {
+  id: string;
+  name: string;
+  color: string;  // hex, ex.: '#f59e0b'
+  createdAt: string;
+}
+```
+
+**Tabela Supabase criada manualmente:**
+```sql
+CREATE TABLE demand_types (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id  UUID NOT NULL,
+  name       TEXT NOT NULL,
+  color      TEXT NOT NULL DEFAULT '#94a3b8',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**`store.tsx`:**
+- Estado `demandTypes: DemandType[]` + `setDemandTypes`
+- Fetch via Supabase no `useEffect([tenantId])`
+- Funções: `addDemandType`, `updateDemandType`, `deleteDemandType` (sem lixeira — exclusão direta)
+- Expostos no `DataContext`
+
+---
+
+### 📋 `CSActions.tsx` — Tabs + Configurar Tipos de Demanda
+
+**Estrutura com dois tabs** (igual ao padrão do Cronograma Mestre):
+- **"Painel de Ações CS"** → tabela de ações (comportamento original)
+- **"Configurar Tipos de Demanda"** → view `DemandTypesConfig`
+
+**`DemandTypesConfig`:**
+- Tabela com `name` + color swatch + ações (edit/delete)
+- Color picker nativo (`<input type="color">`) para cada tipo
+- Edição inline na linha da tabela (Enter salva, Escape cancela)
+- Botão "+ Novo Tipo" abre formulário no topo da tabela
+- Exclusão direta (sem soft delete — tipos não têm lixeira)
+
+**Mudanças no modal `CSActionModal`:**
+- "Tipo de Ação" → **"Tipo de Demanda"** em todos os labels
+- Select agora é dinâmico: `demandTypes.map(...)` (substituiu opções hardcoded)
+- Fallback "Outro (Livre)..." mantido para quando a lista está vazia
+- IDs corrigidos: `crypto.randomUUID()` (antes usava `Date.now()`)
+
+**Mudanças na tabela principal:**
+- Header: "Campanha / Turma" → "Tipo de Demanda / Turma"
+- Bolinha colorida ao lado do nome do tipo (cor vinda de `demandTypes`)
+- Painel de detalhe lateral exibe o tipo com cor
+
+**Exportação XLS:** coluna renomeada para "Tipo de Demanda"
+
+---
+
+### 📝 `CSDailyServices.tsx` — 17 campos completos
+
+**Novas colunas em `cs_daily_services` (aplicadas no Supabase):**
+```sql
+ALTER TABLE cs_daily_services
+  ADD COLUMN class_id        UUID,
+  ADD COLUMN canal_contatado TEXT,
+  ADD COLUMN demand_type_id  UUID,
+  ADD COLUMN resolucao       TEXT,
+  ADD COLUMN repasse         BOOLEAN DEFAULT FALSE,
+  ADD COLUMN repasse_setor   TEXT,
+  ADD COLUMN obs             TEXT,
+  ADD COLUMN valor_venda     NUMERIC(12,2),
+  ADD COLUMN retorno         DATE,
+  ADD COLUMN remarketing     BOOLEAN DEFAULT FALSE,
+  ADD COLUMN objecao         TEXT;
+```
+
+**`CSDailyService` em `types.ts`** — 11 campos opcionais adicionados:
+`classId?`, `canalContatado?`, `demandTypeId?`, `resolucao?`, `repasse?`, `repasseSetor?`, `obs?`, `valorVenda?`, `retorno?`, `remarketing?`, `objecao?`
+
+**Formulário `ServiceModal` — 17 campos em 4 blocos:**
+
+| Bloco | Campos |
+|---|---|
+| Identificação | Data (padrão hoje), Canal Contatado, Telefone*, Nome (auto-link), Turma (select ou auto-detect) |
+| Atendimento | Canal de Atendimento, Tipo de Demanda, Resumo*, Resolução da Demanda, Repasse? (toggle + setor condicional), OBS |
+| Dados Comerciais | Valor de Venda (R$), Data de Retorno, Remarketing (toggle), Objeção |
+| Controle | Status, Responsável |
+
+**Tabela principal** — 7 colunas:
+- Data / Canal, Identificação, Tipo de Demanda (bolinha colorida), Resumo + Resolução, Indicadores, Ações
+
+**Coluna "Indicadores"** — badges automáticos:
+- Status (Concluído / Aguardando Retorno)
+- Repasse (rose) com setor
+- Remarketing (amber)
+- Retorno com data formatada (blue)
+- Valor de Venda (emerald)
+
+**Exportação XLS** — 19 colunas cobrindo todos os campos.
+
+**Busca** — inclui tipo de demanda além dos campos originais.
+
+---
+
+## 🗺️ Próximos passos (Sessão 10+)
+
+### 1. Produtos por Turma — Nome do Plano + Tipo de Lote
 - Campo "Nome do Plano" em `class_products` (texto livre, ex.: "Plano Ouro")
 - Campo "Tipo de Lote" (ex.: "Lote 1", "Lote 2") para controle de precificação progressiva
+- Migration: `ALTER TABLE class_products ADD COLUMN plan_name TEXT, ADD COLUMN lot_type TEXT`
+- UI em `Turmas.tsx` (`ClassProductModal`) + badge na listagem + exibição em `ClientProfileView`
 
-### 3. Hardening de segurança (pré-lançamento)
+### 2. Hardening de segurança (pré-lançamento)
 - Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
 - Auditar todas as queries para garantir `tenant_id` em todos os filtros
 - Remover dados de dev/seed do banco antes do go-live
