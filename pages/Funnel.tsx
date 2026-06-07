@@ -144,10 +144,10 @@ const NewLeadModal: React.FC<{
     const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
     addClient({ 
       ...formData, 
-      id: `cli-${Date.now()}`,
+      id: crypto.randomUUID(),
       tags,
       activities: [{
-        id: `act-${Date.now()}`,
+        id: crypto.randomUUID(),
         type: 'note',
         description: `Negociação iniciada via cadastro individual completo na etapa: ${currentFunnel?.stages.find(s => s.id === formData.stageId)?.name}`,
         timestamp: new Date().toLocaleString('pt-BR')
@@ -167,7 +167,7 @@ const NewLeadModal: React.FC<{
           funnelId: funnelId,
           stageId: targetStageId,
           activities: [{
-            id: `act-move-${Date.now()}-${Math.random()}`,
+            id: crypto.randomUUID(),
             type: 'note',
             description: `Lead importado para o funil "${currentFunnel?.name}" na etapa "${stageName}" por ${currentUser?.name}.`,
             timestamp: new Date().toLocaleString('pt-BR')
@@ -453,7 +453,7 @@ const FunnelView: React.FC = () => {
     updateClientStage(client.id, winStage.id);
     updateNegotiationStatus(client.id, 'GANHO');
     
-    const activity = { id: Date.now().toString(), type: 'note', description: 'Venda confirmada via botão rápido no Funil.', timestamp: new Date().toLocaleString() };
+    const activity = { id: crypto.randomUUID(), type: 'note', description: 'Venda confirmada via botão rápido no Funil.', timestamp: new Date().toLocaleString() };
     updateClient({ ...client, stageId: winStage.id, activities: [activity, ...client.activities] });
   };
 
@@ -464,7 +464,7 @@ const FunnelView: React.FC = () => {
     updateClientStage(client.id, loseStage.id);
     updateNegotiationStatus(client.id, 'PERDIDO');
     
-    const activity = { id: Date.now().toString(), type: 'note', description: 'Negociação marcada como perdida via botão rápido.', timestamp: new Date().toLocaleString() };
+    const activity = { id: crypto.randomUUID(), type: 'note', description: 'Negociação marcada como perdida via botão rápido.', timestamp: new Date().toLocaleString() };
     updateClient({ ...client, stageId: loseStage.id, activities: [activity, ...client.activities] });
   };
 

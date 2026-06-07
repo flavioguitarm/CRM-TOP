@@ -282,7 +282,7 @@ const EventosAdmin: React.FC = () => {
     if (!selectedEvtId || !newActivityText.trim()) return;
 
     const activity: EventActivity = {
-      id: `ev-act-${Date.now()}`,
+      id: crypto.randomUUID(),
       userName: currentUser?.name || 'Operador',
       description: newActivityText,
       timestamp: new Date().toLocaleString('pt-BR')

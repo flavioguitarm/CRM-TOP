@@ -126,13 +126,13 @@ const ClassProductModal: React.FC<{
     if (productToEdit) {
       return {
         ...productToEdit,
-        id: productToEdit.id || `cp-${Date.now()}-${Math.random()}`,
+        id: productToEdit.id || crypto.randomUUID(),
         erpQuantity: productToEdit.erpQuantity ?? 0,
         erpValue: productToEdit.erpValue ?? 0
       };
     }
     return {
-      id: `cp-${Date.now()}-${Math.random()}`,
+      id: crypto.randomUUID(),
       productId: '',
       customPrice: 0,
       goalQuantity: 0,

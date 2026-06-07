@@ -1082,7 +1082,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, activities: [activity, ...c.activities] } : c));
     if (tenantId) {
       supabase.from('client_activities').insert({
-        id:          activity.id || `act-${Date.now()}`,
+        id:          activity.id || crypto.randomUUID(),
         tenant_id:   tenantId,
         client_id:   clientId,
         type:        activity.type,
@@ -1734,7 +1734,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addClassProduct = async (classId: string, cp: ClassProduct) => {
-    const cpWithId = { ...cp, id: cp.id || `cp-${Date.now()}-${Math.random()}` };
+    const cpWithId = { ...cp, id: cp.id || crypto.randomUUID() };
     if (tenantId) {
       const { error } = await supabase.from('class_products').insert({
         id: cpWithId.id,
@@ -1883,7 +1883,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     if (service.clientId) {
       addClientActivity(service.clientId, {
-        id:          `act-cs-${Date.now()}`,
+        id:          crypto.randomUUID(),
         type:        service.type === 'Ligação' ? 'call' : service.type === 'E-mail' ? 'email' : 'note',
         description: `ATENDIMENTO CS: ${service.summary}`,
         timestamp:   new Date().toLocaleString('pt-BR'),

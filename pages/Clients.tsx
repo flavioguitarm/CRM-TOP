@@ -434,7 +434,7 @@ const ClientsView: React.FC = () => {
               updateClient(updatedClient);
           }
       } else {
-          const newId = `cli-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newId = crypto.randomUUID();
           const newClient = {
             ...enrichedItem,
             id: newId,
@@ -451,7 +451,7 @@ const ClientsView: React.FC = () => {
           addClient(newClient);
 
           if (item.soldProductId && item.soldValue) {
-             const negId = `neg-imp-${Date.now()}-${Math.random()}`;
+             const negId = crypto.randomUUID();
              const isSale = !!item.soldDate;
              const isLost = !!item.lostDate;
 
@@ -470,7 +470,7 @@ const ClientsView: React.FC = () => {
 
              if (isSale) {
                 const sale: Sale = {
-                    id: `sale-${Date.now()}-${Math.random()}`,
+                    id: crypto.randomUUID(),
                     clientId: newId,
                     productId: item.soldProductId,
                     value: parseFloat(item.soldValue),
