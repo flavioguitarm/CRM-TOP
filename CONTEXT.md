@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-07 (Sessão 9 — concluída)
+> Atualizado em: 2026-06-07 (Sessão 10 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -638,18 +638,90 @@ ALTER TABLE cs_daily_services
 
 ---
 
-## 🗺️ Próximos passos (Sessão 10+)
+---
 
-### 1. Produtos por Turma — Nome do Plano + Tipo de Lote
-- Campo "Nome do Plano" em `class_products` (texto livre, ex.: "Plano Ouro")
-- Campo "Tipo de Lote" (ex.: "Lote 1", "Lote 2") para controle de precificação progressiva
-- Migration: `ALTER TABLE class_products ADD COLUMN plan_name TEXT, ADD COLUMN lot_type TEXT`
-- UI em `Turmas.tsx` (`ClassProductModal`) + badge na listagem + exibição em `ClientProfileView`
+## ✅ Sessão 10 — Nome do Plano + Tipo de Lote + Hardening de Segurança (2026-06-07)
 
-### 2. Hardening de segurança (pré-lançamento)
-- Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
-- Auditar todas as queries para garantir `tenant_id` em todos os filtros
-- Remover dados de dev/seed do banco antes do go-live
+### 🏷️ Nome do Plano e Tipo de Lote em `class_products`
+
+**Migration aplicada manualmente no Supabase:**
+```sql
+ALTER TABLE class_products
+  ADD COLUMN plan_name TEXT,
+  ADD COLUMN lot_type  TEXT
+    CHECK (lot_type IN (
+      'PROMOCIONAL',
+      'LOTE_1','LOTE_2','LOTE_3','LOTE_4',
+      'LOTE_5','LOTE_6','LOTE_7','LOTE_8',
+      'LOTE_SANTO'
+    ));
+```
+Ambas as colunas opcionais (sem `NOT NULL`, sem `DEFAULT`).
+
+**`types.ts`:**
+```ts
+export interface ClassProduct {
+  // ... campos existentes ...
+  planName?: string;   // ← NOVO — texto livre, ex.: "Plano Ouro"
+  lotType?: string;    // ← NOVO — enum: PROMOCIONAL | LOTE_1 … LOTE_8 | LOTE_SANTO
+}
+```
+
+**`store.tsx` — 4 pontos atualizados:**
+- Select query: `plan_name, lot_type` incluídos em `class_products(...)`
+- Deserialização: `planName: cp.plan_name ?? undefined`, `lotType: cp.lot_type ?? undefined`
+- `addClassProduct`: `plan_name: cp.planName ?? null`, `lot_type: cp.lotType ?? null`
+- `updateClassProduct`: mesmos campos no update
+
+**`Turmas.tsx` — `ClassProductModal`:**
+- Campo texto "Nome do Plano" (input livre, placeholder "Ex: Plano Ouro...")
+- Select "Tipo de Lote" com 10 opções: Sem tipo / Promocional / Lote 1–8 / Lote Santo
+- Estado inicial: `planName: ''`, `lotType: ''`
+- Na listagem de produtos da turma: badge do lote ao lado de Único/Múltiplo + nome do plano ao lado do preço de tabela
+
+**`ClientProfileView.tsx`:**
+- Dropdown de produtos: texto da option inclui nome do plano e tipo de lote
+- Badge contextual ao selecionar produto: pills extras de plano e lote
+
+---
+
+### 🔒 Hardening de Segurança — RLS com `auth.uid()`
+
+**Problema identificado e corrigido:** As políticas originais usavam `current_setting('app.current_tenant_id', true)::uuid`, que é transaction-local e incompatível com o PostgREST do Supabase (cada request HTTP = transação nova, `current_setting` retorna `null` → queries silenciosamente vazias).
+
+**Solução aplicada:** Todas as políticas foram reescritas para usar `auth.uid()` diretamente — o JWT de cada request já carrega o `sub` do usuário, e o PostgREST popula `auth.uid()` automaticamente em cada transação.
+
+**SQL aplicado:**
+- RLS reativado em **25 tabelas** (21 originais + `backup_settings` + `demand_types` + 2 junction tables)
+- `DROP POLICY / CREATE POLICY tenant_isolation` em todas as tabelas com `tenant_id` direto → `USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())`
+- Junction tables (`class_courses`, `funnel_responsible_users`) → `EXISTS` com join na tabela pai verificando `auth.uid()`
+- Função `set_tenant_id()` criada mas **não necessária** — `auth.uid()` resolve sem RPC auxiliar
+
+**Status atual:**
+- ✅ RLS ativa em todas as 25 tabelas
+- ✅ Políticas usam `auth.uid()` (JWT-based, zero configuração no cliente)
+- ✅ Isolamento multi-tenant garantido a nível de banco
+- ✅ Filtros `.eq('tenant_id', tenantId)` no cliente mantidos como redundância (defesa em profundidade)
+
+---
+
+## 🗺️ Próximos passos (Sessão 11+)
+
+### 1. Testes gerais do sistema
+- Validar todas as telas com RLS ativa (login com usuário real, verificar que dados não vazam entre tenants)
+- Testar fluxo completo: cadastro → negociação → venda → relatório
+- Verificar importação em massa, restauração da lixeira e backup com RLS ativa
+
+### 2. Deploy em produção
+- Build `npm run build` + deploy do `dist/` em CDN estática (Vercel / Netlify / S3)
+- Configurar variáveis de ambiente de produção
+- Verificar HashRouter funcionando no host de destino
+- Deploy da Edge Function `auto-backup` no Supabase
+
+### 3. Integração WhatsApp + Agente ARES
+- Definir arquitetura de integração (webhook WhatsApp → Supabase → CRM)
+- Agente ARES: acesso aos dados do CRM via API / Edge Functions
+- Fluxo de atendimento automatizado conectado ao `cs_daily_services`
 
 ---
 
@@ -667,7 +739,7 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 
 1. **`tenantId`** no store = UUID do usuário autenticado no Supabase Auth. Cada usuário autenticado é seu próprio tenant.
 
-2. **RLS desativada** — isolamento feito apenas por `.eq('tenant_id', tenantId)` nas queries.
+2. **RLS ativa** — políticas usam `auth.uid()` (JWT-based). Filtros `.eq('tenant_id', tenantId)` no cliente mantidos como redundância.
 
 3. **`funnel_stages.order`** é palavra reservada no PostgreSQL — criado como `"order"` na migration.
 
@@ -686,3 +758,7 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 10. **`logo-top.png.png`** — nome com extensão dupla (arquivo salvo assim pelo usuário). Referenciado como `/assets/logo-top.png.png` no código. Não renomear sem atualizar Sidebar.tsx e LoginPage.tsx.
 
 11. **`class_products.sale_limit`** — coluna adicionada manualmente no Supabase via ALTER TABLE na Sessão 6. Não consta no arquivo `001_initial_schema.sql` original. Valor padrão: `'MULTIPLO'`.
+
+12. **`class_products.plan_name` e `class_products.lot_type`** — colunas adicionadas manualmente na Sessão 10. Ambas opcionais (nullable, sem default). `lot_type` tem CHECK constraint com 10 valores válidos.
+
+13. **RLS e `auth.uid()`** — todas as políticas usam `auth.uid()`, não `current_setting`. A função `set_tenant_id()` existe no banco mas não é chamada pelo cliente — o JWT resolve automaticamente via PostgREST.
