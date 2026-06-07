@@ -77,6 +77,8 @@ export interface ClassProduct {
   erpQuantity?: number;
   erpValue?: number;
   saleLimit: SaleLimit;
+  planName?: string;
+  lotType?: string;
 }
 
 export interface ClassRoom {

@@ -149,6 +149,8 @@ function mapClassRow(row: any): ClassRoom {
       erpQuantity: cp.erp_quantity ?? undefined,
       erpValue: cp.erp_value ?? undefined,
       saleLimit: (cp.sale_limit as 'UNICO' | 'MULTIPLO') ?? 'MULTIPLO',
+      planName: cp.plan_name ?? undefined,
+      lotType: cp.lot_type ?? undefined,
     })),
     timeline: (row.class_timeline_events ?? []).map((te: any) => ({
       id: te.id,
@@ -416,7 +418,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         id, name, institution_id, graduation_year, graduation_month,
         comercial_externo, gestor_projeto, consultor_cs_id, created_at,
         class_courses(course_id),
-        class_products(id, product_id, custom_price, goal_quantity, goal_value, erp_quantity, erp_value, sale_limit),
+        class_products(id, product_id, custom_price, goal_quantity, goal_value, erp_quantity, erp_value, sale_limit, plan_name, lot_type),
         class_timeline_events(id, title, date, description, completed)
       `)
       .eq('tenant_id', tenantId)
@@ -1745,6 +1747,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         erp_quantity: cp.erpQuantity ?? null,
         erp_value: cp.erpValue ?? null,
         sale_limit: cp.saleLimit ?? 'MULTIPLO',
+        plan_name: cp.planName ?? null,
+        lot_type: cp.lotType ?? null,
       });
       if (error) console.error('addClassProduct:', error.message);
     }
@@ -1760,6 +1764,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         erp_quantity: cp.erpQuantity ?? null,
         erp_value: cp.erpValue ?? null,
         sale_limit: cp.saleLimit ?? 'MULTIPLO',
+        plan_name: cp.planName ?? null,
+        lot_type: cp.lotType ?? null,
       }).eq('id', cp.id).eq('tenant_id', tenantId);
       if (error) console.error('updateClassProduct:', error.message);
     }

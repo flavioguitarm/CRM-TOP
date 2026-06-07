@@ -140,6 +140,8 @@ const ClassProductModal: React.FC<{
       erpQuantity: 0,
       erpValue: 0,
       saleLimit: 'MULTIPLO' as const,
+      planName: '',
+      lotType: '',
     };
   });
 
@@ -222,6 +224,38 @@ const ClassProductModal: React.FC<{
                 </span>
               </button>
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome do Plano</label>
+            <input
+              type="text"
+              placeholder="Ex: Plano Ouro, Pacote Completo..."
+              className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+              value={formData.planName || ''}
+              onChange={e => setFormData(prev => ({ ...prev, planName: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Lote</label>
+            <select
+              className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+              value={formData.lotType || ''}
+              onChange={e => setFormData(prev => ({ ...prev, lotType: e.target.value }))}
+            >
+              <option value="">Sem tipo de lote</option>
+              <option value="PROMOCIONAL">Promocional</option>
+              <option value="LOTE_1">Lote 1</option>
+              <option value="LOTE_2">Lote 2</option>
+              <option value="LOTE_3">Lote 3</option>
+              <option value="LOTE_4">Lote 4</option>
+              <option value="LOTE_5">Lote 5</option>
+              <option value="LOTE_6">Lote 6</option>
+              <option value="LOTE_7">Lote 7</option>
+              <option value="LOTE_8">Lote 8</option>
+              <option value="LOTE_SANTO">Lote Santo</option>
+            </select>
           </div>
 
           <div className="space-y-1">
@@ -637,7 +671,7 @@ const TurmasAdmin: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <div className="p-2.5 bg-slate-50 rounded-2xl text-slate-400"><Tag size={20}/></div>
                           <div>
-                            <div className="flex items-center gap-2 mb-0.5">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                               <p className="text-sm font-black text-slate-900 uppercase">{baseProd?.name || 'Produto Removido'}</p>
                               <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border ${
                                 cp.saleLimit === 'UNICO'
@@ -646,8 +680,18 @@ const TurmasAdmin: React.FC = () => {
                               }`}>
                                 {cp.saleLimit === 'UNICO' ? '① Único' : '∞ Múltiplo'}
                               </span>
+                              {cp.lotType && (
+                                <span className="text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border bg-slate-100 text-slate-600 border-slate-200">
+                                  {cp.lotType.replace('_', ' ')}
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Tabela Turma: R$ {cp.customPrice.toLocaleString()}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Tabela Turma: R$ {cp.customPrice.toLocaleString()}</p>
+                              {cp.planName && (
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">· {cp.planName}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

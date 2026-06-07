@@ -435,24 +435,36 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
                   <option value="">Escolher Produto...</option>
                   {allowedClassProducts.map(p => {
                     const blocked = uniqueLimitProductsOwned.has(p.productId);
+                    const lotLabel = p.lotType ? ` · ${p.lotType.replace('_', ' ')}` : '';
+                    const planLabel = p.planName ? ` · ${p.planName}` : '';
                     return (
                       <option key={p.productId} value={p.productId} disabled={blocked}>
-                        {p.name}{p.saleLimit === 'UNICO' ? ' · ① Único' : ''}
+                        {p.name}{planLabel}{lotLabel}{p.saleLimit === 'UNICO' ? ' · ① Único' : ''}
                         {blocked ? ' — já adquirido' : ''}
                       </option>
                     );
                   })}
                 </select>
 
-                {/* Badge de limite do produto selecionado */}
+                {/* Badge de limite + plano + lote do produto selecionado */}
                 {selectedProductId && (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex-wrap ${
                     isUnicoSelected
                       ? 'bg-slate-900 text-white'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}>
                     <span>{isUnicoSelected ? '①' : '∞'}</span>
                     {isUnicoSelected ? 'Produto com limite único por aluno' : 'Produto sem limite de unidades'}
+                    {selectedCp?.planName && (
+                      <span className="px-2 py-0.5 rounded-full bg-white/20 border border-current/20">
+                        {selectedCp.planName}
+                      </span>
+                    )}
+                    {selectedCp?.lotType && (
+                      <span className="px-2 py-0.5 rounded-full bg-white/20 border border-current/20">
+                        {selectedCp.lotType.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
                 )}
 
