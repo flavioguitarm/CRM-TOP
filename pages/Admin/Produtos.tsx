@@ -182,7 +182,7 @@ const ProdutosAdmin: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Catálogo de Vendas</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Catálogo de Vendas</h1>
           <p className="text-slate-500 font-medium">Gestão centralizada de itens e categorias comerciais.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ const ProdutosAdmin: React.FC = () => {
                   })}
                   {productCategories.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="py-20 text-center text-slate-300 italic uppercase text-xs font-black tracking-widest">Nenhuma categoria personalizada</td>
+                      <td colSpan={3} className="py-20 text-center text-slate-300 uppercase text-xs font-black tracking-widest">Nenhuma categoria personalizada</td>
                     </tr>
                   )}
                 </tbody>

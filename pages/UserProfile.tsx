@@ -24,7 +24,7 @@ const UserProfile: React.FC = () => {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Minhas Informações</h1>
+        <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Minhas Informações</h1>
         <p className="text-sm text-slate-500 mt-1">Gerencie seu perfil e dados de acesso.</p>
       </div>
 

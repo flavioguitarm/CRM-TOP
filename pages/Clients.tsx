@@ -561,7 +561,7 @@ const ClientsView: React.FC = () => {
     <div className="h-full flex gap-6 overflow-hidden">
       <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedClientId ? 'w-1/2' : 'w-full'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Clientes</h1><p className="text-slate-500 font-medium">Gestão centralizada da sua base mestre de leads.</p></div>
+          <div><h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Clientes</h1><p className="text-slate-500 font-medium">Gestão centralizada da sua base mestre de leads.</p></div>
           <div className="flex items-center gap-3">
             {perms.canInsert && (
               <>

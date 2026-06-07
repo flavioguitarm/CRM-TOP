@@ -134,10 +134,17 @@ export interface CSActionActivity {
   timestamp: string;
 }
 
+export interface DemandType {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
 export interface CSAction {
   id: string;
   classId: string;
-  type: string;
+  type: string; // Tipo de Demanda (nome livre ou id referenciando DemandType)
   startDate: string;
   endDate: string;
   status: string;
@@ -153,15 +160,27 @@ export interface CSAction {
 
 export interface CSDailyService {
   id: string;
-  clientId: string; // pode ser vazio se não houver coincidência de telefone
-  clientPhone: string; // campo obrigatório para vínculo
+  clientId: string;          // pode ser vazio se não houver coincidência de telefone
+  clientPhone: string;       // campo obrigatório para vínculo
   clientNameManual?: string; // nome caso não haja vínculo
   date: string;
-  type: string; // WhatsApp, Ligação, E-mail, Presencial
+  type: string;              // Canal de Atendimento: WhatsApp, Ligação, E-mail, Presencial
   summary: string;
   status: string;
   responsibleUserId: string;
   createdAt: string;
+  // Campos expandidos (Sessão 9)
+  classId?: string;
+  canalContatado?: string;
+  demandTypeId?: string;
+  resolucao?: string;
+  repasse?: boolean;
+  repasseSetor?: string;
+  obs?: string;
+  valorVenda?: number;
+  retorno?: string;
+  remarketing?: boolean;
+  objecao?: string;
 }
 
 export interface Funnel {

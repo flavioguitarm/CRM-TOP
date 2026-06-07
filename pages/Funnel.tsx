@@ -188,7 +188,7 @@ const NewLeadModal: React.FC<{
       <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Inserir Negociação</h3>
+            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Inserir Negociação</h3>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gestão de Entrada de Leads</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-900 transition-all"><X size={32} /></button>
@@ -333,7 +333,7 @@ const NewLeadModal: React.FC<{
                     </div>
                   ))}
                   {eligibleFromBase.length === 0 && (
-                    <div className="col-span-2 py-10 text-center text-slate-300 italic border-2 border-dashed border-slate-100 rounded-3xl">
+                    <div className="col-span-2 py-10 text-center text-slate-300 border-2 border-dashed border-slate-100 rounded-3xl">
                       Nenhum lead disponível para importação com os filtros atuais.
                     </div>
                   )}
@@ -379,7 +379,7 @@ const BulkMoveModal: React.FC<{ onClose: () => void; funnelId: string; }> = ({ o
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[150] flex items-center justify-center p-4">
       <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-2xl font-black text-slate-900 uppercase italic">Mover em Lote</h3>
+          <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Mover em Lote</h3>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-900"><X size={32} /></button>
         </div>
         <div className="p-8 space-y-6 flex-1 overflow-y-auto bg-white">
@@ -488,7 +488,7 @@ const FunnelView: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic leading-none">Negociações</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Negociações</h1>
           <p className="text-slate-500 font-medium mt-1">Gestão tática do fluxo de conversão.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -599,7 +599,7 @@ const FunnelView: React.FC = () => {
                     );
                   })}
                   {stageClients.length === 0 && (
-                    <div className="py-12 text-center text-slate-200 italic border-4 border-dashed border-slate-100/50 rounded-[2.5rem]">
+                    <div className="py-12 text-center text-slate-200 border-4 border-dashed border-slate-100/50 rounded-[2.5rem]">
                       <p className="text-[9px] font-black uppercase tracking-widest">Solte aqui para mover</p>
                     </div>
                   )}

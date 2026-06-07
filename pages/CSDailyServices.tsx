@@ -2,52 +2,79 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../store';
 import {
-  Plus, Headset, X, Edit3, Trash2, MessageSquare,
-  Send, User, Search, Calendar, CheckCircle2,
-  Filter, Building2, ChevronDown, Phone, Mail,
-  Clock, Download, FileSpreadsheet, Check, UserPlus,
-  AlertCircle, CheckSquare, Square
+  Plus, Headset, X, Edit3, Trash2,
+  Send, Search, CheckCircle2,
+  Filter, Phone,
+  Download, FileSpreadsheet, Check,
+  AlertCircle, CheckSquare, Square,
+  RotateCcw, MessageCircle
 } from 'lucide-react';
-import { CSDailyService, Client } from '../types';
+import { CSDailyService } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
+// Campos canal contatado e canal de atendimento (opções fixas)
+const CANAL_CONTATADO_OPTIONS = ['WhatsApp', 'Ligação', 'Instagram', 'Facebook', 'E-mail', 'Presencial', 'Outro'];
+const CANAL_ATENDIMENTO_OPTIONS = ['WhatsApp', 'Ligação', 'E-mail', 'Presencial', 'Instagram', 'Outro'];
+
+// ── Modal de criação/edição de Atendimento ────────────────────────────────────
 const ServiceModal: React.FC<{
   serviceToEdit?: CSDailyService | null;
   onClose: () => void;
 }> = ({ serviceToEdit, onClose }) => {
-  const { clients, classes, addCSDailyService, updateCSDailyService, currentUser, users } = useData();
-  
+  const { clients, classes, addCSDailyService, updateCSDailyService, currentUser, users, demandTypes } = useData();
+
+  const today = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState<Partial<CSDailyService>>(
     serviceToEdit || {
       clientId: '',
       clientPhone: '',
       clientNameManual: '',
-      date: new Date().toISOString().split('T')[0],
-      type: 'WhatsApp',
+      date: today,
+      canalContatado: '',
+      type: 'WhatsApp',         // Canal de Atendimento
+      demandTypeId: '',
       summary: '',
+      resolucao: '',
+      repasse: false,
+      repasseSetor: '',
+      obs: '',
+      valorVenda: undefined,
+      retorno: '',
+      remarketing: false,
+      objecao: '',
       status: 'Concluído',
       responsibleUserId: currentUser?.id || '',
+      classId: '',
     }
   );
 
   const matchedClient = useMemo(() => {
-      if (!formData.clientPhone) return null;
-      return clients.find(c => c.phone.replace(/\D/g, '') === formData.clientPhone?.replace(/\D/g, ''));
+    if (!formData.clientPhone) return null;
+    return clients.find(c => c.phone.replace(/\D/g, '') === formData.clientPhone?.replace(/\D/g, ''));
   }, [formData.clientPhone, clients]);
 
-  // Atualiza clientId e nome manual automaticamente quando encontra um match
+  // Preenche clientId, nome e turma automaticamente ao encontrar match por telefone
   useEffect(() => {
-      if (matchedClient) {
-          setFormData(prev => ({ ...prev, clientId: matchedClient.id, clientNameManual: matchedClient.name }));
-      } else if (!serviceToEdit) {
-          setFormData(prev => ({ ...prev, clientId: '', clientNameManual: '' }));
-      }
+    if (matchedClient) {
+      setFormData(prev => ({
+        ...prev,
+        clientId: matchedClient.id,
+        clientNameManual: matchedClient.name,
+        classId: prev.classId || matchedClient.classId || '',
+      }));
+    } else if (!serviceToEdit) {
+      setFormData(prev => ({ ...prev, clientId: '', clientNameManual: '' }));
+    }
   }, [matchedClient, serviceToEdit]);
 
-  const clientClass = useMemo(() => matchedClient ? classes.find(cl => cl.id === matchedClient.classId) : null, [matchedClient, classes]);
+  const clientClass = useMemo(() =>
+    matchedClient ? classes.find(cl => cl.id === matchedClient.classId) : null,
+    [matchedClient, classes]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,131 +83,314 @@ const ServiceModal: React.FC<{
     if (serviceToEdit) {
       updateCSDailyService(formData as CSDailyService);
     } else {
-      const newId = `serv-${Date.now()}`;
       addCSDailyService({
         ...formData,
-        id: newId,
+        id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
       } as CSDailyService);
     }
     onClose();
   };
 
+  const set = (patch: Partial<CSDailyService>) => setFormData(prev => ({ ...prev, ...patch }));
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-        <div className="p-8 border-b border-slate-100 bg-white flex items-center justify-between">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+        <div className="p-8 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-lg">
               <Headset size={24} />
             </div>
             <div>
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
-                {serviceToEdit ? 'Editar Registro' : 'Novo Registro por Telefone'}
+              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                {serviceToEdit ? 'Editar Atendimento' : 'Novo Atendimento Diário'}
               </h3>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Busca automática por vínculo telefônico</p>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Registro completo do atendimento</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-900 transition-all"><X size={32} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 bg-white">
-          
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 bg-white">
+
+          {/* Bloco 1: Identificação */}
           <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Identificação</p>
+
+            {/* Data */}
             <div className="space-y-1">
-                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
-                    <Phone size={12}/> 1. Telefone do Contato *
-                </label>
-                <input 
-                    required
-                    placeholder="(00) 00000-0000"
-                    className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl px-6 py-4 text-sm font-black text-amber-900 shadow-inner focus:ring-4 focus:ring-amber-500/20 outline-none transition-all"
-                    value={formData.clientPhone}
-                    onChange={e => setFormData({...formData, clientPhone: e.target.value})}
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Data</label>
+              <input
+                type="date"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.date}
+                onChange={e => set({ date: e.target.value })}
+              />
+            </div>
+
+            {/* Canal Contatado */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Canal Contatado</label>
+              <select
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.canalContatado}
+                onChange={e => set({ canalContatado: e.target.value })}
+              >
+                <option value="" className="italic">Selecione o canal...</option>
+                {CANAL_CONTATADO_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Telefone */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                <Phone size={12}/> 3. Telefone do Contato *
+              </label>
+              <input
+                required
+                placeholder="(00) 00000-0000"
+                className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl px-6 py-4 text-sm font-black text-amber-900 shadow-inner focus:ring-4 focus:ring-amber-500/20 outline-none transition-all"
+                value={formData.clientPhone}
+                onChange={e => set({ clientPhone: e.target.value })}
+              />
+            </div>
+
+            {/* Nome */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">4. Nome</label>
+              <div className="relative">
+                <input
+                  placeholder={matchedClient ? '' : 'Nenhum cliente vinculado a este telefone...'}
+                  className={`w-full border rounded-2xl px-6 py-4 text-sm font-bold shadow-sm outline-none transition-all ${matchedClient ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-400'}`}
+                  value={formData.clientNameManual}
+                  onChange={e => set({ clientNameManual: e.target.value })}
+                  readOnly={!!matchedClient}
                 />
+                {matchedClient && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" size={20}/>}
+              </div>
+              {!matchedClient && formData.clientPhone && (
+                <p className="text-[8px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 px-2">
+                  <AlertCircle size={10}/> Telefone não localizado na base.
+                </p>
+              )}
             </div>
 
+            {/* Turma */}
             <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Nome do Formando</label>
-                <div className="relative">
-                    <input 
-                        placeholder={matchedClient ? "" : "Nenhum cliente vinculado a este telefone..."}
-                        className={`w-full border rounded-2xl px-6 py-4 text-sm font-bold shadow-sm outline-none transition-all ${matchedClient ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-400'}`}
-                        value={formData.clientNameManual}
-                        onChange={e => setFormData({...formData, clientNameManual: e.target.value})}
-                        readOnly={!!matchedClient}
-                    />
-                    {matchedClient && <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" size={20}/>}
-                </div>
-                {!matchedClient && formData.clientPhone && (
-                    <p className="text-[8px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 px-2">
-                        <AlertCircle size={10}/> Telefone não localizado na base. O nome será preenchido após cadastro do cliente.
-                    </p>
-                )}
-            </div>
-          </div>
-
-          {matchedClient && (
-            <div className="bg-slate-900 p-6 rounded-[2rem] border border-slate-800 grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">5. Turma</label>
+              {matchedClient && clientClass ? (
+                <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between animate-in slide-in-from-top-2">
+                  <div>
                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Turma Identificada</p>
-                    <p className="text-xs font-black text-amber-400 uppercase">{clientClass?.name || 'Geral'}</p>
+                    <p className="text-xs font-black text-amber-400 uppercase">{clientClass.name}</p>
+                  </div>
+                  <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-black px-2 py-1 rounded-full border border-emerald-500/20 uppercase">Vínculo Ativo</span>
                 </div>
-                <div className="text-right flex flex-col items-end justify-center">
-                    <span className="bg-emerald-500/10 text-emerald-400 text-[8px] font-black px-2 py-1 rounded-full border border-emerald-500/20 uppercase">
-                        Vínculo Ativo
-                    </span>
-                </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3. Data do Contato</label>
-                <input type="date" className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">4. Meio Utilizado</label>
-                <select className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                    <option value="WhatsApp">WhatsApp</option>
-                    <option value="Ligação">Ligação</option>
-                    <option value="E-mail">E-mail</option>
-                    <option value="Presencial">Presencial</option>
-                    <option value="Instagram">Instagram</option>
+              ) : (
+                <select
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                  value={formData.classId}
+                  onChange={e => set({ classId: e.target.value })}
+                >
+                  <option value="" className="italic">Selecione a turma...</option>
+                  {classes.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
                 </select>
+              )}
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">5. Resumo da Conversa *</label>
-            <textarea 
+          {/* Bloco 2: Atendimento */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Atendimento</p>
+
+            {/* Canal de Atendimento */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">6. Canal de Atendimento</label>
+              <select
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.type}
+                onChange={e => set({ type: e.target.value })}
+              >
+                {CANAL_ATENDIMENTO_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Tipo de Demanda */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">7. Tipo de Demanda</label>
+              <select
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.demandTypeId}
+                onChange={e => set({ demandTypeId: e.target.value })}
+              >
+                <option value="" className="italic">Selecione o tipo de demanda...</option>
+                {demandTypes.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+              </select>
+            </div>
+
+            {/* Resumo da conversa (mapeado para summary) */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">8. Resumo da Conversa *</label>
+              <textarea
                 required
                 placeholder="Relate o que foi tratado..."
-                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none min-h-[120px]"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none min-h-[90px]"
                 value={formData.summary}
-                onChange={e => setFormData({...formData, summary: e.target.value})}
-            />
+                onChange={e => set({ summary: e.target.value })}
+              />
+            </div>
+
+            {/* Resolução da Demanda */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">9. Resolução da Demanda</label>
+              <textarea
+                placeholder="Como a demanda foi resolvida..."
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none min-h-[80px]"
+                value={formData.resolucao}
+                onChange={e => set({ resolucao: e.target.value })}
+              />
+            </div>
+
+            {/* Repasse */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">10. Repasse? Qual Setor?</label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1">
+                  <button
+                    type="button"
+                    onClick={() => set({ repasse: false, repasseSetor: '' })}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${!formData.repasse ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                  >
+                    Não
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => set({ repasse: true })}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${formData.repasse ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400'}`}
+                  >
+                    Sim
+                  </button>
+                </div>
+                {formData.repasse && (
+                  <input
+                    autoFocus
+                    placeholder="Qual setor?"
+                    className="flex-1 border border-amber-200 rounded-2xl px-4 py-3 text-sm font-bold bg-amber-50 focus:ring-2 focus:ring-amber-500 outline-none animate-in slide-in-from-left-2"
+                    value={formData.repasseSetor}
+                    onChange={e => set({ repasseSetor: e.target.value })}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* OBS */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">11. OBS</label>
+              <textarea
+                placeholder="Observações adicionais..."
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none min-h-[70px]"
+                value={formData.obs}
+                onChange={e => set({ obs: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
-            <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">6. Status</label>
-                <select className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                    <option value="Concluído">Concluído</option>
-                    <option value="Aguardando Retorno">Aguardando Retorno</option>
-                    <option value="Pendente">Pendente</option>
-                </select>
+          {/* Bloco 3: Dados comerciais */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Dados Comerciais</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Valor de Venda */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">12. Valor de Venda (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  className="w-full bg-white border border-emerald-100 text-emerald-900 rounded-2xl px-6 py-4 text-sm font-black shadow-sm focus:ring-2 focus:ring-emerald-400 outline-none"
+                  value={formData.valorVenda ?? ''}
+                  onChange={e => set({ valorVenda: e.target.value ? parseFloat(e.target.value) : undefined })}
+                />
+              </div>
+
+              {/* Retorno */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">13. Data de Retorno</label>
+                <input
+                  type="date"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                  value={formData.retorno}
+                  onChange={e => set({ retorno: e.target.value })}
+                />
+              </div>
             </div>
+
+            {/* Remarketing */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">14. Remarketing</label>
+              <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => set({ remarketing: false })}
+                  className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${!formData.remarketing ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                >
+                  Não
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set({ remarketing: true })}
+                  className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${formData.remarketing ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400'}`}
+                >
+                  Sim
+                </button>
+              </div>
+            </div>
+
+            {/* Objeção */}
             <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">7. Responsável</label>
-                <select className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.responsibleUserId} onChange={e => setFormData({...formData, responsibleUserId: e.target.value})}>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">15. Objeção</label>
+              <input
+                placeholder="Qual a objeção apresentada..."
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.objecao}
+                onChange={e => set({ objecao: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {/* Bloco 4: Status e Responsável */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Controle</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">16. Status</label>
+                <select
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm"
+                  value={formData.status}
+                  onChange={e => set({ status: e.target.value })}
+                >
+                  <option value="Concluído">Concluído</option>
+                  <option value="Aguardando Retorno">Aguardando Retorno</option>
+                  <option value="Pendente">Pendente</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">17. Responsável</label>
+                <select
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm"
+                  value={formData.responsibleUserId}
+                  onChange={e => set({ responsibleUserId: e.target.value })}
+                >
                   {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+              </div>
             </div>
           </div>
 
           <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-            <Send size={20}/> Gravar Atendimento Diário
+            <Send size={20}/> Gravar Atendimento
           </button>
         </form>
       </div>
@@ -188,8 +398,9 @@ const ServiceModal: React.FC<{
   );
 };
 
+// ── View principal ────────────────────────────────────────────────────────────
 const CSDailyServicesView: React.FC = () => {
-  const { csDailyServices, clients, classes, users, moveToTrash, addCSDailyService, currentUser } = useData();
+  const { csDailyServices, clients, classes, users, moveToTrash, addCSDailyService, currentUser, demandTypes } = useData();
   const perms = usePermissions('atendimentosCs');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -201,7 +412,7 @@ const CSDailyServicesView: React.FC = () => {
   const handleBulkImport = (data: any[]) => {
     const today = new Date().toISOString().split('T')[0];
     data.forEach(item => {
-      if (!item.clientPhone) return; // telefone é obrigatório
+      if (!item.clientPhone) return;
       const service: CSDailyService = {
         id:                crypto.randomUUID(),
         date:              item.date || today,
@@ -220,9 +431,9 @@ const CSDailyServicesView: React.FC = () => {
 
   const importFields = [
     { key: 'date',              label: 'Data (AAAA-MM-DD)',           required: true },
-    { key: 'type',              label: 'Meio de Contato',             required: true },
     { key: 'clientPhone',       label: 'Telefone do Contato',         required: true },
     { key: 'clientNameManual',  label: 'Nome Manual (opcional)' },
+    { key: 'type',              label: 'Canal de Atendimento',        required: true },
     { key: 'summary',           label: 'Resumo',                      required: true },
     { key: 'status',            label: 'Status' },
     { key: 'responsibleUserId', label: 'ID do Responsável (opcional)' },
@@ -244,34 +455,47 @@ const CSDailyServicesView: React.FC = () => {
     return csDailyServices.filter(s => {
       const client = clients.find(c => c.id === s.clientId);
       const searchLower = searchTerm.toLowerCase();
+      const demandType = demandTypes.find(d => d.id === s.demandTypeId);
       return (
         client?.name.toLowerCase().includes(searchLower) ||
         s.clientPhone.includes(searchTerm) ||
         s.summary.toLowerCase().includes(searchLower) ||
         s.clientNameManual?.toLowerCase().includes(searchLower) ||
-        s.type.toLowerCase().includes(searchLower)
+        s.type.toLowerCase().includes(searchLower) ||
+        demandType?.name.toLowerCase().includes(searchLower)
       );
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [csDailyServices, clients, searchTerm]);
+  }, [csDailyServices, clients, searchTerm, demandTypes]);
 
   const handleExportXLS = () => {
     const exportData = filteredServices.map(s => {
       const client = clients.find(c => c.id === s.clientId);
-      const cls = client ? classes.find(cl => cl.id === client.classId) : null;
+      const cls = classes.find(cl => cl.id === (s.classId || client?.classId));
       const user = users.find(u => u.id === s.responsibleUserId);
+      const demandType = demandTypes.find(d => d.id === s.demandTypeId);
       return {
         "Data": new Date(s.date).toLocaleDateString('pt-BR'),
+        "Canal Contatado": s.canalContatado || '',
         "Telefone": s.clientPhone,
-        "Formando": client?.name || s.clientNameManual || 'NÃO VINCULADO',
-        "Vínculo Base": client ? 'SIM' : 'NÃO',
+        "Nome": client?.name || s.clientNameManual || 'NÃO VINCULADO',
         "Turma": cls?.name || 'N/A',
-        "Meio": s.type,
+        "Canal de Atendimento": s.type,
+        "Tipo de Demanda": demandType?.name || '',
         "Resumo": s.summary,
+        "Resolução": s.resolucao || '',
+        "Repasse?": s.repasse ? 'Sim' : 'Não',
+        "Setor de Repasse": s.repasseSetor || '',
+        "OBS": s.obs || '',
+        "Valor de Venda": s.valorVenda ?? '',
+        "Retorno": s.retorno ? new Date(s.retorno).toLocaleDateString('pt-BR') : '',
+        "Remarketing": s.remarketing ? 'Sim' : 'Não',
+        "Objeção": s.objecao || '',
         "Status": s.status,
-        "Responsável": user?.name || 'N/A'
+        "Responsável": user?.name || 'N/A',
+        "Vínculo Base": client ? 'SIM' : 'NÃO',
       };
     });
-    
+
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Atendimentos Diários");
@@ -282,12 +506,12 @@ const CSDailyServicesView: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight italic leading-none">Atendimentos Diários CS</h1>
-          <p className="text-slate-500 font-medium mt-2 uppercase text-[10px] tracking-widest">Registro rápido via telefone com automação de histórico.</p>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Atendimentos Diários CS</h1>
+          <p className="text-slate-500 font-medium mt-2 uppercase text-[10px] tracking-widest">Registro detalhado com automação de histórico.</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
-            <Download size={18} /> Relatório de Atendimentos
+            <Download size={18} /> Relatório
           </button>
           {perms.canInsert && (
             <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all">
@@ -305,9 +529,9 @@ const CSDailyServicesView: React.FC = () => {
       <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-4">
          <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-                type="text" 
-                placeholder="Pesquisar por telefone, formando ou resumo..." 
+            <input
+                type="text"
+                placeholder="Pesquisar por telefone, formando, tipo de demanda ou resumo..."
                 className="w-full pl-12 pr-4 py-4 rounded-xl border-none bg-slate-50 text-sm font-bold focus:ring-2 focus:ring-amber-500 transition-all shadow-inner"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -315,7 +539,7 @@ const CSDailyServicesView: React.FC = () => {
          </div>
          <div className="flex items-center gap-2 px-6 border-l border-slate-100">
             <Filter size={18} className="text-slate-300" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros Inteligentes</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredServices.length} registros</span>
          </div>
       </div>
 
@@ -329,18 +553,20 @@ const CSDailyServicesView: React.FC = () => {
                     {selectedIds.size === filteredServices.length && filteredServices.length > 0 ? <CheckSquare size={16}/> : <Square size={16}/>}
                   </button>
                 </th>
-                <th className="px-8 py-5">Data / Meio</th>
-                <th className="px-8 py-5">Identificação</th>
-                <th className="px-8 py-5">Resumo Técnico</th>
-                <th className="px-8 py-5">Status / Vínculo</th>
-                <th className="px-8 py-5 text-right">Ações</th>
+                <th className="px-6 py-5">Data / Canal</th>
+                <th className="px-6 py-5">Identificação</th>
+                <th className="px-6 py-5">Tipo de Demanda</th>
+                <th className="px-6 py-5">Resumo</th>
+                <th className="px-6 py-5">Indicadores</th>
+                <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredServices.map(service => {
                 const client = clients.find(c => c.id === service.clientId);
-                const cls = client ? classes.find(cl => cl.id === client.classId) : null;
+                const cls = classes.find(cl => cl.id === (service.classId || client?.classId));
                 const user = users.find(u => u.id === service.responsibleUserId);
+                const demandType = demandTypes.find(d => d.id === service.demandTypeId);
 
                 return (
                   <tr key={service.id} className={`hover:bg-amber-50/30 transition-colors group ${selectedIds.has(service.id) ? 'bg-amber-50' : ''}`}>
@@ -349,42 +575,83 @@ const CSDailyServicesView: React.FC = () => {
                         {selectedIds.has(service.id) ? <CheckSquare size={16} className="text-amber-500"/> : <Square size={16}/>}
                       </button>
                     </td>
-                    <td className="px-8 py-5">
+                    <td className="px-6 py-5">
                       <div>
-                        <p className="text-sm font-black text-slate-900">{new Date(service.date).toLocaleDateString('pt-BR')}</p>
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-white border border-slate-200 mt-1.5 inline-block text-slate-500 shadow-sm">
-                            {service.type}
+                        <p className="text-sm font-black text-slate-900">{new Date(service.date + 'T12:00').toLocaleDateString('pt-BR')}</p>
+                        {service.canalContatado && (
+                          <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-500 inline-block mt-1">
+                            {service.canalContatado}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-white border border-slate-200 mt-1 inline-block text-slate-500 shadow-sm ml-1">
+                          {service.type}
                         </span>
                       </div>
                     </td>
-                    <td className="px-8 py-5">
+                    <td className="px-6 py-5">
                       <div>
                         <p className="text-[10px] font-black text-amber-600 mb-1 flex items-center gap-1"><Phone size={10}/> {service.clientPhone}</p>
-                        <p className={`text-sm font-black uppercase leading-tight ${client ? 'text-slate-700' : 'text-slate-300 italic font-bold'}`}>
-                            {client?.name || service.clientNameManual || 'Aguardando Vínculo...'}
+                        <p className={`text-sm font-black uppercase leading-tight ${client ? 'text-slate-700' : 'text-slate-300 font-bold'}`}>
+                          {client?.name || service.clientNameManual || 'Aguardando Vínculo...'}
                         </p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">{cls?.name || 'Turma não vinculada'}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{cls?.name || 'Turma não vinculada'}</p>
                       </div>
                     </td>
-                    <td className="px-8 py-5 max-w-xs">
-                        <p className="text-xs font-bold text-slate-600 line-clamp-2 leading-relaxed italic border-l-2 border-slate-200 pl-3">
-                            "{service.summary}"
-                        </p>
-                    </td>
-                    <td className="px-8 py-5">
-                        <div className="flex flex-col gap-2 items-start">
-                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${service.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                                {service.status}
-                            </span>
-                            <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-lg border ${client ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                {client ? 'Sincronizado' : 'Offline'}
-                            </span>
+                    <td className="px-6 py-5">
+                      {demandType ? (
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: demandType.color }} />
+                          <span className="text-xs font-black text-slate-700 uppercase">{demandType.name}</span>
                         </div>
+                      ) : (
+                        <span className="text-xs text-slate-300">—</span>
+                      )}
                     </td>
-                    <td className="px-8 py-5 text-right">
+                    <td className="px-6 py-5 max-w-[200px]">
+                      <p className="text-xs font-bold text-slate-600 line-clamp-2 leading-relaxed border-l-2 border-slate-200 pl-3">
+                        "{service.summary}"
+                      </p>
+                      {service.resolucao && (
+                        <p className="text-[9px] font-bold text-emerald-600 mt-1 line-clamp-1">↳ {service.resolucao}</p>
+                      )}
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${service.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                          {service.status}
+                        </span>
+                        {service.repasse && (
+                          <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200">
+                            Repasse{service.repasseSetor ? `: ${service.repasseSetor}` : ''}
+                          </span>
+                        )}
+                        {service.remarketing && (
+                          <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">
+                            Remarketing
+                          </span>
+                        )}
+                        {service.retorno && (
+                          <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1">
+                            <RotateCcw size={8}/> {new Date(service.retorno + 'T12:00').toLocaleDateString('pt-BR')}
+                          </span>
+                        )}
+                        {service.valorVenda ? (
+                          <span className="text-[8px] font-black text-emerald-600">R$ {service.valorVenda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                          {perms.canEdit && <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm"><Edit3 size={18}/></button>}
-                          {perms.canDelete && <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [service.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm"><Trash2 size={18}/></button>}
+                          {perms.canEdit && (
+                            <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm">
+                              <Edit3 size={18}/>
+                            </button>
+                          )}
+                          {perms.canDelete && (
+                            <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [service.id]); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-600 transition-all hover:bg-white rounded-xl shadow-sm">
+                              <Trash2 size={18}/>
+                            </button>
+                          )}
                        </div>
                     </td>
                   </tr>
@@ -392,10 +659,10 @@ const CSDailyServicesView: React.FC = () => {
               })}
               {filteredServices.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-24 text-center">
+                  <td colSpan={7} className="py-24 text-center">
                      <div className="flex flex-col items-center opacity-10">
                         <Headset size={64} className="mb-4" />
-                        <p className="font-black uppercase text-xs tracking-widest">Nenhum registro de contato</p>
+                        <p className="font-black uppercase text-xs tracking-widest">Nenhum registro de atendimento</p>
                      </div>
                   </td>
                 </tr>

@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-06 (Sessão 7 — em andamento)
+> Atualizado em: 2026-06-06 (Sessão 8 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -483,26 +483,68 @@ export enum UserRole {
 
 ---
 
-## 🗺️ Próximos passos (Sessão 8+)
+## ✅ Sessão 8 — HelpTooltip Fix, Padronização Tipográfica (2026-06-06)
 
-### 1. Hardening de segurança (pré-lançamento)
-- Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
-- Auditar todas as queries para garantir `tenant_id` em todos os filtros
-- Remover dados de dev/seed do banco antes do go-live
+### 🔧 Fix: HelpTooltip viewport-aware (`components/HelpTooltip.tsx`)
+
+**Problema:** tooltip cortado nas bordas da tela quando o trigger ficava próximo das margens.
+
+**Solução — reescrita completa:**
+- `position: fixed` + `getBoundingClientRect()` para coordenadas relativas ao viewport
+- `calcPosition(trigger, tooltipEl, preferredSide)` — testa o lado preferido, faz fallback (top→bottom→right→left) se não couber
+- `Arrow` component calcula posição relativa ao centro do trigger
+- Double `requestAnimationFrame` em `open()` para medir altura real do DOM
+- Listeners de `scroll` (capture mode) e `resize` para reposicionar em tempo real
+- `z-index: 99999` via inline style
+- Constantes: `TOOLTIP_WIDTH=224`, `TOOLTIP_GAP=10`, `ARROW_SIZE=6`, `SCREEN_PADDING=8`
+- Fix TS: `position = 'top' as Side` no destructure de props
+
+---
+
+### 🎨 Padronização Tipográfica Global
+
+**Regras estabelecidas:**
+- **H1 de páginas:** `text-2xl font-bold text-slate-900 uppercase tracking-wider`
+- **Subtítulos de seção:** `text-sm font-semibold text-slate-900 uppercase tracking-wider`
+- **`italic` removido** de todos os títulos, labels e empty states (exceto 3 `<option>` de placeholder em selects)
+
+**Arquivos alterados (16):**
+
+| Arquivo | Alterações |
+|---|---|
+| `Dashboard.tsx` | h1, 3×h3, span, empty state |
+| `Funnel.tsx` | h1, 2×h3, 2× empty states |
+| `Agenda.tsx` | h1, h2, label, 2× empty states |
+| `CSDailyServices.tsx` | h1, h3, 3× inline italics removidos |
+| `CSActions.tsx` | h1 |
+| `Clients.tsx` | h1 |
+| `UserProfile.tsx` | h1 |
+| `Admin/Instituicoes.tsx` | h1 (`tracking-tight` → `tracking-wider`) |
+| `Admin/Turmas.tsx` | h1 |
+| `Admin/Produtos.tsx` | h1, empty state `italic` removido |
+| `Admin/Eventos.tsx` | h1, span `italic` removido |
+| `Admin/Trash.tsx` | h1 |
+| `Admin/Backup.tsx` | h1 |
+| `Admin/Database.tsx` | h1 |
+| `components/GenericRegistry.tsx` | h1 (adicionado `uppercase tracking-wider`), empty state `italic` removido |
+| `components/ClientProfileView.tsx` | 2× `italic` removidos (activity description + empty state) |
+
+---
+
+## 🗺️ Próximos passos (Sessão 9+)
+
+### 1. Melhorias CS
+- **Tipos de Demanda:** cadastro de tipos reutilizáveis para `CSActions` e `CSDailyServices`
+- **Campos adicionais em Atendimentos:** campos configuráveis por tipo de demanda
+
+### 2. Produtos por Turma — Nome do Plano + Tipo de Lote
+- Campo "Nome do Plano" em `class_products` (texto livre, ex.: "Plano Ouro")
+- Campo "Tipo de Lote" (ex.: "Lote 1", "Lote 2") para controle de precificação progressiva
 
 ### 3. Hardening de segurança (pré-lançamento)
 - Reativar RLS no Supabase com `set_config('app.current_tenant_id', ...)` no cliente
 - Auditar todas as queries para garantir `tenant_id` em todos os filtros
 - Remover dados de dev/seed do banco antes do go-live
-
-### 4. Integração WhatsApp + Agente ARES
-- Webhook para receber mensagens do WhatsApp e criar `CSDailyService` automaticamente
-- Agente ARES: assistente IA para triagem e resposta automática de leads
-- Vínculo automático entre número de telefone e `client_id`
-
-### 5. App mobile para diretoria
-- Dashboard executivo (KPIs, conversão, faturamento) em React Native ou PWA
-- Notificações push para ações críticas (leads novos, metas atingidas)
 
 ---
 

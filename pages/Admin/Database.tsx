@@ -331,7 +331,7 @@ const DatabaseAdmin: React.FC = () => {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider flex items-center gap-3">
           <Database size={28} className="text-amber-500" />
           Segurança & Backup
         </h1>

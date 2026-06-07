@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -34,6 +34,8 @@ interface DataContextType {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   activityTypes: ActivityType[];
   setActivityTypes: React.Dispatch<React.SetStateAction<ActivityType[]>>;
+  demandTypes: DemandType[];
+  setDemandTypes: React.Dispatch<React.SetStateAction<DemandType[]>>;
   sales: Sale[];
   setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
   negotiations: ProductNegotiation[];
@@ -73,6 +75,9 @@ interface DataContextType {
   addActivityType: (data: Omit<ActivityType, 'id' | 'createdAt'>) => Promise<void>;
   updateActivityType: (activityType: ActivityType) => Promise<void>;
   deleteActivityType: (id: string) => Promise<void>;
+  addDemandType: (data: Omit<DemandType, 'id' | 'createdAt'>) => Promise<void>;
+  updateDemandType: (demandType: DemandType) => Promise<void>;
+  deleteDemandType: (id: string) => Promise<void>;
   addClass: (newClass: ClassRoom) => Promise<void>;
   updateClass: (updatedClass: ClassRoom) => Promise<void>;
   deleteClass: (classId: string) => void;
@@ -306,6 +311,18 @@ function mapCSDailyServiceRow(row: any): CSDailyService {
     status:            row.status ?? '',
     responsibleUserId: row.responsible_user_id ?? '',
     createdAt:         row.created_at ?? '',
+    // Campos expandidos
+    classId:        row.class_id        ?? undefined,
+    canalContatado: row.canal_contatado ?? undefined,
+    demandTypeId:   row.demand_type_id  ?? undefined,
+    resolucao:      row.resolucao       ?? undefined,
+    repasse:        row.repasse         ?? undefined,
+    repasseSetor:   row.repasse_setor   ?? undefined,
+    obs:            row.obs             ?? undefined,
+    valorVenda:     row.valor_venda     ?? undefined,
+    retorno:        row.retorno         ?? undefined,
+    remarketing:    row.remarketing     ?? undefined,
+    objecao:        row.objecao         ?? undefined,
   };
 }
 
@@ -350,6 +367,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts]         = useState<Product[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [demandTypes, setDemandTypes]     = useState<DemandType[]>([]);
 
   // Fetch: institutions
   useEffect(() => {
@@ -526,6 +544,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
   }, [tenantId]);
 
+  // Fetch: demandTypes
+  useEffect(() => {
+    if (!tenantId) { setDemandTypes([]); return; }
+    supabase
+      .from('demand_types')
+      .select('id, name, color, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('demandTypes fetch:', error.message); return; }
+        setDemandTypes((data ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          color:     r.color ?? '#94a3b8',
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
   const [events, setEvents] = useState<Event[]>([]);
   const [csActions, setCsActions] = useState<CSAction[]>([]);
   const [csDailyServices, setCsDailyServices] = useState<CSDailyService[]>([]);
@@ -571,7 +608,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!tenantId) { setCsDailyServices([]); return; }
     supabase
       .from('cs_daily_services')
-      .select('id, client_id, client_phone, client_name_manual, date, type, summary, status, responsible_user_id, created_at')
+      .select('id, client_id, client_phone, client_name_manual, date, type, summary, status, responsible_user_id, created_at, class_id, canal_contatado, demand_type_id, resolucao, repasse, repasse_setor, obs, valor_venda, retorno, remarketing, objecao')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
@@ -1363,6 +1400,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTrash(prev => [{ id: `trash-${Date.now()}-${Math.random()}`, entityType: 'activityType', data: item, deletedAt: new Date().toISOString(), originalName: item.name }, ...prev]);
   };
 
+  // ── demandTypes ──────────────────────────────────────────────────────────────
+
+  const addDemandType = async (data: Omit<DemandType, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('demand_types')
+      .insert({ tenant_id: tenantId, name: data.name, color: data.color ?? '#94a3b8' })
+      .select('id, name, color, created_at')
+      .single();
+    if (error) { console.error('addDemandType:', error.message); return; }
+    setDemandTypes(prev => [...prev, { id: row.id, name: row.name, color: row.color ?? '#94a3b8', createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateDemandType = async (demandType: DemandType) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('demand_types')
+      .update({ name: demandType.name, color: demandType.color })
+      .eq('id', demandType.id)
+      .eq('tenant_id', tenantId);
+    if (error) { console.error('updateDemandType:', error.message); return; }
+    setDemandTypes(prev => prev.map(d => d.id === demandType.id ? demandType : d));
+  };
+
+  const deleteDemandType = async (id: string) => {
+    if (!tenantId) return;
+    const { error } = await supabase.from('demand_types').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteDemandType:', error.message); return; }
+    setDemandTypes(prev => prev.filter(d => d.id !== id));
+  };
+
   // ── classes ─────────────────────────────────────────────────────────────────
 
   const addClass = async (newClass: ClassRoom) => {
@@ -1794,6 +1862,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         summary:             service.summary,
         status:              service.status,
         responsible_user_id: service.responsibleUserId || null,
+        class_id:            service.classId           || null,
+        canal_contatado:     service.canalContatado     || null,
+        demand_type_id:      service.demandTypeId       || null,
+        resolucao:           service.resolucao          || null,
+        repasse:             service.repasse            ?? null,
+        repasse_setor:       service.repasseSetor       || null,
+        obs:                 service.obs                || null,
+        valor_venda:         service.valorVenda         ?? null,
+        retorno:             service.retorno            || null,
+        remarketing:         service.remarketing        ?? null,
+        objecao:             service.objecao            || null,
       }).then(({ error }) => { if (error) console.error('addCSDailyService:', error.message); });
     }
     if (service.clientId) {
@@ -1818,6 +1897,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         summary:             service.summary,
         status:              service.status,
         responsible_user_id: service.responsibleUserId || null,
+        class_id:            service.classId           || null,
+        canal_contatado:     service.canalContatado     || null,
+        demand_type_id:      service.demandTypeId       || null,
+        resolucao:           service.resolucao          || null,
+        repasse:             service.repasse            ?? null,
+        repasse_setor:       service.repasseSetor       || null,
+        obs:                 service.obs                || null,
+        valor_venda:         service.valorVenda         ?? null,
+        retorno:             service.retorno            || null,
+        remarketing:         service.remarketing        ?? null,
+        objecao:             service.objecao            || null,
       }).eq('id', service.id).eq('tenant_id', tenantId)
         .then(({ error }) => { if (error) console.error('updateCSDailyService:', error.message); });
     }
@@ -2122,7 +2212,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       users, setUsers, institutions, setInstitutions, courses, setCourses,
       productCategories, setProductCategories,
       products, setProducts, classes, setClasses, funnels, setFunnels,
-      clients, setClients, events, setEvents, tasks, setTasks, activityTypes, setActivityTypes, sales, setSales,
+      clients, setClients, events, setEvents, tasks, setTasks, activityTypes, setActivityTypes, demandTypes, setDemandTypes, sales, setSales,
       negotiations, setNegotiations, csActions, setCsActions, csDailyServices, setCsDailyServices, trash,
       googleSheetUrl, setGoogleSheetUrl, syncWithGoogleSheet,
       moveToTrash, restoreFromTrash, permanentDeleteFromTrash, purgeExpiredTrash,
@@ -2133,6 +2223,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addProductCategory, updateProductCategory, deleteProductCategory,
       addProduct, updateProduct, deleteProduct,
       addActivityType, updateActivityType, deleteActivityType,
+      addDemandType, updateDemandType, deleteDemandType,
       addClass, updateClass, deleteClass, addEvent, updateEvent, addEventActivity, deleteEvent,
       addTask, updateTask, toggleTask, deleteTask,
       canDeleteEntity, updateFunnel, addFunnel, deleteFunnel, isStageOccupied,

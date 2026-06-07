@@ -129,8 +129,8 @@ const Dashboard: React.FC = () => {
     <div className="space-y-10 animate-in fade-in duration-700 pb-20">
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8">
         <div>
-          <div className="flex items-center gap-2 text-amber-500 mb-2"><Zap size={16} className="animate-pulse" /><span className="text-[11px] font-black uppercase tracking-[0.3em] italic">Platinum Analytics Core</span></div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Dashboard</h1>
+          <div className="flex items-center gap-2 text-amber-500 mb-2"><Zap size={16} className="animate-pulse" /><span className="text-[11px] font-black uppercase tracking-[0.3em]">Platinum Analytics Core</span></div>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Dashboard</h1>
           <p className="text-slate-500 font-bold mt-2 uppercase text-[10px] tracking-widest">Painel Tático de Performance Comercial</p>
         </div>
 
@@ -180,7 +180,7 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col h-[500px]">
-          <div className="flex items-center justify-between mb-10"><div className="flex items-center gap-4"><div className="p-3 bg-amber-500 text-white rounded-2xl shadow-lg shadow-amber-200"><BarChart3 size={20} /></div><div><h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Cronograma de Faturamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Evolução baseada em filtros ativos</p></div></div></div>
+          <div className="flex items-center justify-between mb-10"><div className="flex items-center gap-4"><div className="p-3 bg-amber-500 text-white rounded-2xl shadow-lg shadow-amber-200"><BarChart3 size={20} /></div><div><h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Cronograma de Faturamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Evolução baseada em filtros ativos</p></div></div></div>
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={salesTimeSeries}>
@@ -201,7 +201,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm min-h-[450px] flex flex-col">
-          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center"><Activity size={20} /></div><div><h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Status da Base</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribuição por período</p></div></div>
+          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center"><Activity size={20} /></div><div><h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Status da Base</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribuição por período</p></div></div>
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyStatusData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10, fontWeight: 800}}/><YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}}/>
@@ -213,14 +213,14 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm min-h-[450px] flex flex-col">
-          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center"><AlertTriangle size={20} /></div><div><h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic">Análise de Churn</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Principais motivos de perda filtrados</p></div></div>
+          <div className="flex items-center gap-3 mb-8"><div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center"><AlertTriangle size={20} /></div><div><h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Análise de Churn</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Principais motivos de perda filtrados</p></div></div>
           <div className="flex-1">
             {dashboardData.lossReasonsData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboardData.lossReasonsData} layout="vertical" margin={{ left: 20, right: 40 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10, fontWeight: 800}} width={110}/>
                         <Tooltip cursor={{fill: '#f8fafc', radius: 12}} contentStyle={{ borderRadius: '24px', border: 'none' }} />
                         <Bar dataKey="value" radius={[0, 12, 12, 0]} barSize={32}>{dashboardData.lossReasonsData.map((e, i) => <Cell key={`c-${i}`} fill={i === 0 ? '#f43f5e' : '#fda4af'} />)}</Bar>
                     </BarChart></ResponsiveContainer>
-            ) : (<div className="h-full flex flex-col items-center justify-center text-slate-300 italic"><XCircle size={64} className="mb-4 opacity-10" /><p className="font-black uppercase text-xs tracking-widest">Nenhuma perda detectada</p></div>)}
+            ) : (<div className="h-full flex flex-col items-center justify-center text-slate-300"><XCircle size={64} className="mb-4 opacity-10" /><p className="font-black uppercase text-xs tracking-widest">Nenhuma perda detectada</p></div>)}
           </div>
         </div>
       </div>

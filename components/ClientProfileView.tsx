@@ -38,13 +38,13 @@ const HistoryModal: React.FC<{ activities: Activity[]; onClose: () => void; clie
                 <span className="text-[10px] font-black uppercase text-amber-400 tracking-[0.2em]">{activity.type}</span>
                 <span className="text-[10px] font-bold text-slate-400">{activity.timestamp}</span>
              </div>
-             <p className="text-sm text-white font-black leading-relaxed italic group-hover:not-italic transition-all">
+             <p className="text-sm text-white font-black leading-relaxed group-hover:not-italic transition-all">
                 {activity.description}
              </p>
           </div>
         ))}
         {activities.length === 0 && (
-          <div className="py-20 text-center text-slate-500 italic uppercase text-xs font-black tracking-widest">
+          <div className="py-20 text-center text-slate-500 uppercase text-xs font-black tracking-widest">
              Nenhum registro encontrado.
           </div>
         )}

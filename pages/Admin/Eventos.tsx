@@ -321,7 +321,7 @@ const EventosAdmin: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Cronograma Mestre</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Cronograma Mestre</h1>
           <p className="text-slate-500 font-medium">Controle total dos eventos físicos, comerciais e financeiros.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -482,7 +482,7 @@ const EventosAdmin: React.FC = () => {
                           </span>
                        </div>
                      ) : (
-                       <span className="text-sm font-black text-slate-400 uppercase italic">Evento de âmbito geral</span>
+                       <span className="text-sm font-black text-slate-400 uppercase">Evento de âmbito geral</span>
                      )}
                    </div>
                 </div>

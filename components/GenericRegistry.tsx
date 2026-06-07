@@ -146,7 +146,7 @@ export function GenericRegistry<T extends { id: string }>({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">{title}</h1>
           <p className="text-slate-500">{description}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -260,7 +260,7 @@ export function GenericRegistry<T extends { id: string }>({
               })}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length + 2} className="px-6 py-12 text-center text-slate-400 italic">Nenhum registro encontrado.</td>
+                  <td colSpan={columns.length + 2} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td>
                 </tr>
               )}
             </tbody>

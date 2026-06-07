@@ -190,7 +190,7 @@ const InstituicoesAdmin: React.FC = () => {
     <div className="h-full flex gap-6 overflow-hidden">
       <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedInstId ? 'w-1/2' : 'w-full'}`}>
         <div className="flex items-center justify-between">
-          <div><h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Instituições</h1><p className="text-slate-500 font-medium">Controle o cadastro de parceiros acadêmicos e seus campi.</p></div>
+          <div><h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Instituições</h1><p className="text-slate-500 font-medium">Controle o cadastro de parceiros acadêmicos e seus campi.</p></div>
           <div className="flex items-center gap-3">
              <button onClick={toggleSelectAll} className="bg-slate-100 text-slate-600 px-4 py-3 rounded-2xl font-black text-xs uppercase border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
                {selectedIds.size === sortedInstitutions.length && sortedInstitutions.length > 0 ? <CheckSquare size={16}/> : <Square size={16}/>} Selecionar tudo

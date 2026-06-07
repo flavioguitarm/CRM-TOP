@@ -110,7 +110,7 @@ const TrashPage: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">Lixeira do Sistema <HelpTooltip text={`Itens excluídos ficam aqui por até ${EXPIRY_DAYS} dias e podem ser restaurados a qualquer momento. A exclusão permanente manual só fica disponível após ${MANUAL_DELETE_DAYS} dias e exige confirmação de senha.`} position="right" /></h1>
+                    <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">Lixeira do Sistema <HelpTooltip text={`Itens excluídos ficam aqui por até ${EXPIRY_DAYS} dias e podem ser restaurados a qualquer momento. A exclusão permanente manual só fica disponível após ${MANUAL_DELETE_DAYS} dias e exige confirmação de senha.`} position="right" /></h1>
                     <p className="text-slate-500 font-medium">Itens expiram automaticamente após {EXPIRY_DAYS} dias. Exclusão manual disponível após {MANUAL_DELETE_DAYS} dias.</p>
                 </div>
                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">

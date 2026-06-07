@@ -93,7 +93,7 @@ const AgendaView: React.FC = () => {
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 flex-1 animate-in fade-in slide-in-from-bottom-4">
         <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
           <CalendarIcon className="text-amber-500" size={24} />
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Operações do Dia</h2>
+          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Operações do Dia</h2>
         </div>
         
         {(dayEvents.length > 0 || dayActions.length > 0 || dayTasks.length > 0) ? (
@@ -119,7 +119,7 @@ const AgendaView: React.FC = () => {
                                </span>
                             </div>
                             <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{t.title}</h4>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1 italic">Vinc: {client?.name || 'N/A'}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Vinc: {client?.name || 'N/A'}</p>
                          </div>
                          <CheckCircle2 className={`opacity-20 ${t.completed ? 'text-emerald-500' : 'text-rose-400'}`} size={32} />
                       </div>
@@ -216,7 +216,7 @@ const AgendaView: React.FC = () => {
             })}
           </div>
         ) : (
-          <div className="py-24 flex flex-col items-center justify-center text-slate-300 italic">
+          <div className="py-24 flex flex-col items-center justify-center text-slate-300">
             <CalendarIcon size={64} className="mb-4 opacity-10" />
             <p className="font-black text-xs uppercase tracking-widest">Nenhuma operação detectada para este dia.</p>
           </div>
@@ -447,7 +447,7 @@ const AgendaView: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="h-80 flex flex-col items-center justify-center text-slate-300 italic">
+            <div className="h-80 flex flex-col items-center justify-center text-slate-300">
               <Search size={48} className="mb-4 opacity-10" />
               <p className="font-black text-xs uppercase tracking-widest">Nenhum evento mapeado no período solicitado.</p>
             </div>
@@ -461,7 +461,7 @@ const AgendaView: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight italic">Agenda Integrada CRM</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Agenda Integrada CRM</h1>
           <p className="text-slate-500 font-medium">Lançamentos de Cronograma, Campanhas de CS e Tarefas Táticas.</p>
         </div>
 

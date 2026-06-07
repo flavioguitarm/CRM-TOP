@@ -1,27 +1,29 @@
 
 import React, { useState, useMemo } from 'react';
 import { useData } from '../store';
-import { 
-  Plus, Zap, X, Edit3, Trash2, MessageSquare, 
-  Send, User, TrendingUp, DollarSign, Target, 
-  Calendar, ArrowRight, CheckCircle2, LayoutGrid, FileSpreadsheet, Download, Check
+import {
+  Plus, Zap, X, Edit3, Trash2, MessageSquare,
+  Send, TrendingUp, DollarSign, Target,
+  Calendar, CheckCircle2, LayoutGrid, FileSpreadsheet, Download, Check,
+  Settings, Palette, Save
 } from 'lucide-react';
-import { CSAction, CSActionActivity } from '../types';
+import { CSAction, CSActionActivity, DemandType } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
+// ── Modal de criação/edição de Ação CS ────────────────────────────────────────
 const CSActionModal: React.FC<{
   actionToEdit?: CSAction | null;
   onClose: () => void;
 }> = ({ actionToEdit, onClose }) => {
-  const { classes, addCSAction, updateCSAction, currentUser, users } = useData();
-  
+  const { classes, addCSAction, updateCSAction, currentUser, users, demandTypes } = useData();
+
   const [formData, setFormData] = useState<Partial<CSAction>>(
     actionToEdit || {
       classId: '',
-      type: 'Campanhas de Whatsapp',
+      type: '',
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date().toISOString().split('T')[0],
       status: 'INICIAR',
@@ -60,13 +62,13 @@ const CSActionModal: React.FC<{
     } else {
       addCSAction({
         ...finalData,
-        id: `cs-${Date.now()}`,
+        id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         activities: [{
-            id: `act-${Date.now()}`,
+            id: crypto.randomUUID(),
             userName: currentUser?.name || 'Sistema',
             description: 'Ação criada e iniciada no CRM.',
-            timestamp: new Date().toLocaleString()
+            timestamp: new Date().toLocaleString('pt-BR')
         }]
       });
     }
@@ -94,13 +96,13 @@ const CSActionModal: React.FC<{
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Turma Vinculada *</label>
-            <select 
+            <select
                 required
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
                 value={formData.classId}
                 onChange={e => setFormData({...formData, classId: e.target.value})}
             >
-              <option value="">Buscar Turma...</option>
+              <option value="" className="italic">Buscar Turma...</option>
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -113,25 +115,27 @@ const CSActionModal: React.FC<{
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3. Tipo de Ação</label>
-            <select 
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3. Tipo de Demanda</label>
+            <select
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm mb-2"
-                value={isTypeOther ? 'Outro' : formData.type}
+                value={isTypeOther ? '__outro__' : formData.type}
                 onChange={e => {
-                    if (e.target.value === 'Outro') { setIsTypeOther(true); } 
+                    if (e.target.value === '__outro__') { setIsTypeOther(true); }
                     else { setIsTypeOther(false); setFormData({...formData, type: e.target.value}); }
                 }}
             >
-                <option value="Campanhas de Whatsapp">Campanhas de Whatsapp</option>
-                <option value="Ação Comercial">Ação Comercial</option>
-                <option value="Comunicação Simples">Comunicação Simples</option>
-                <option value="Financeiro">Financeiro</option>
-                <option value="Cobrança">Cobrança</option>
-                <option value="Outro">Outro (Livre)...</option>
+                <option value="" className="italic">Selecione um tipo de demanda...</option>
+                {demandTypes.map(dt => (
+                  <option key={dt.id} value={dt.name}>{dt.name}</option>
+                ))}
+                {demandTypes.length === 0 && (
+                  <option value="" disabled>Nenhum tipo cadastrado — configure em "Tipos de Demanda"</option>
+                )}
+                <option value="__outro__">Outro (Livre)...</option>
             </select>
             {isTypeOther && (
-              <input 
-                placeholder="Digite o novo tipo de ação..."
+              <input
+                placeholder="Digite o tipo de demanda..."
                 className="w-full bg-white border border-amber-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm animate-in slide-in-from-top-2"
                 value={customType}
                 onChange={e => setCustomType(e.target.value)}
@@ -153,11 +157,11 @@ const CSActionModal: React.FC<{
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">6. Status da Ação</label>
-            <select 
+            <select
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm mb-2"
-                value={isStatusOther ? 'Outro' : formData.status}
+                value={isStatusOther ? '__outro__' : formData.status}
                 onChange={e => {
-                    if (e.target.value === 'Outro') { setIsStatusOther(true); } 
+                    if (e.target.value === '__outro__') { setIsStatusOther(true); }
                     else { setIsStatusOther(false); setFormData({...formData, status: e.target.value}); }
                 }}
             >
@@ -165,10 +169,10 @@ const CSActionModal: React.FC<{
                 <option value="FEITO">FEITO</option>
                 <option value="PARADO">PARADO</option>
                 <option value="NEGADO">NEGADO</option>
-                <option value="Outro">Outro (Livre)...</option>
+                <option value="__outro__">Outro (Livre)...</option>
             </select>
             {isStatusOther && (
-                <input 
+                <input
                     placeholder="Digite o status customizado..."
                     className="w-full bg-white border border-amber-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm animate-in slide-in-from-top-2"
                     value={customStatus}
@@ -180,12 +184,12 @@ const CSActionModal: React.FC<{
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">7. Consultor Responsável</label>
-            <select 
+            <select
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm"
                 value={formData.responsibleUserId || ''}
                 onChange={e => setFormData({...formData, responsibleUserId: e.target.value})}
             >
-              <option value="">Selecione o consultor...</option>
+              <option value="" className="italic">Selecione o consultor...</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
@@ -226,9 +230,160 @@ const CSActionModal: React.FC<{
   );
 };
 
+// ── View: Configurar Tipos de Demanda ────────────────────────────────────────
+const DemandTypesConfig: React.FC = () => {
+  const { demandTypes, addDemandType, updateDemandType, deleteDemandType } = useData();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#94a3b8');
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState('#f59e0b');
+  const [isAdding, setIsAdding] = useState(false);
+
+  const startEdit = (dt: DemandType) => {
+    setEditingId(dt.id);
+    setEditName(dt.name);
+    setEditColor(dt.color);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editName.trim()) return;
+    await updateDemandType({ id: editingId, name: editName.trim(), color: editColor, createdAt: '' });
+    setEditingId(null);
+  };
+
+  const handleAdd = async () => {
+    if (!newName.trim()) return;
+    await addDemandType({ name: newName.trim(), color: newColor });
+    setNewName('');
+    setNewColor('#f59e0b');
+    setIsAdding(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Tipos de Demanda</h2>
+          <p className="text-slate-400 text-xs mt-1">Tipos compartilhados entre Painel de Ações CS e Atendimentos Diários.</p>
+        </div>
+        <button
+          onClick={() => setIsAdding(true)}
+          className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:bg-amber-600 transition-all"
+        >
+          <Plus size={16} /> Novo Tipo
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        {/* Formulário de adição */}
+        {isAdding && (
+          <div className="p-6 border-b border-slate-100 bg-amber-50 animate-in slide-in-from-top-2">
+            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-4">Novo Tipo de Demanda</p>
+            <div className="flex items-center gap-4">
+              <input
+                type="color"
+                value={newColor}
+                onChange={e => setNewColor(e.target.value)}
+                className="w-12 h-12 rounded-xl border-2 border-slate-200 cursor-pointer flex-shrink-0"
+                title="Escolha a cor"
+              />
+              <input
+                autoFocus
+                placeholder="Nome do tipo de demanda..."
+                className="flex-1 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setIsAdding(false); }}
+              />
+              <button onClick={handleAdd} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase flex items-center gap-2">
+                <Save size={14} /> Salvar
+              </button>
+              <button onClick={() => setIsAdding(false)} className="p-3 text-slate-400 hover:text-slate-900 rounded-xl transition-all">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50">
+              <th className="px-8 py-5">Cor</th>
+              <th className="px-8 py-5">Nome do Tipo</th>
+              <th className="px-8 py-5 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {demandTypes.map(dt => (
+              <tr key={dt.id} className="hover:bg-slate-50 transition-colors group">
+                <td className="px-8 py-4 w-20">
+                  {editingId === dt.id ? (
+                    <input
+                      type="color"
+                      value={editColor}
+                      onChange={e => setEditColor(e.target.value)}
+                      className="w-10 h-10 rounded-xl border-2 border-slate-200 cursor-pointer"
+                    />
+                  ) : (
+                    <span
+                      className="inline-block w-8 h-8 rounded-xl border-2 border-white shadow-sm"
+                      style={{ backgroundColor: dt.color }}
+                    />
+                  )}
+                </td>
+                <td className="px-8 py-4">
+                  {editingId === dt.id ? (
+                    <input
+                      autoFocus
+                      className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none w-full max-w-xs"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                    />
+                  ) : (
+                    <span className="text-sm font-black text-slate-900">{dt.name}</span>
+                  )}
+                </td>
+                <td className="px-8 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                    {editingId === dt.id ? (
+                      <>
+                        <button onClick={saveEdit} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"><Save size={16}/></button>
+                        <button onClick={() => setEditingId(null)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-all"><X size={16}/></button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(dt)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={16}/></button>
+                        <button onClick={() => deleteDemandType(dt.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16}/></button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {demandTypes.length === 0 && !isAdding && (
+              <tr>
+                <td colSpan={3} className="py-20 text-center">
+                  <div className="flex flex-col items-center gap-3 opacity-20">
+                    <Palette size={48} />
+                    <p className="font-black uppercase text-xs tracking-widest">Nenhum tipo cadastrado</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ── View principal: Painel de Ações CS ────────────────────────────────────────
 const CSActionsView: React.FC = () => {
-  const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users } = useData();
+  const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users, demandTypes } = useData();
   const perms = usePermissions('acoesCs');
+  const [activeTab, setActiveTab] = useState<'painel' | 'tipos'>('painel');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -264,7 +419,7 @@ const CSActionsView: React.FC = () => {
     e.preventDefault();
     if (!selectedActionId || !newActivityText.trim()) return;
     const activity: CSActionActivity = {
-      id: `act-${Date.now()}`,
+      id: crypto.randomUUID(),
       userName: currentUser?.name || 'Operador',
       description: newActivityText,
       timestamp: new Date().toLocaleString('pt-BR')
@@ -287,7 +442,7 @@ const CSActionsView: React.FC = () => {
     data.forEach(item => {
       addCSAction({
         ...item,
-        id: `cs-${Date.now()}-${Math.random()}`,
+        id: crypto.randomUUID(),
         activities: [],
         createdAt: new Date().toISOString(),
         totalReached: parseInt(item.totalReached) || 0,
@@ -304,7 +459,7 @@ const CSActionsView: React.FC = () => {
         const user = users.find(u => u.id === a.responsibleUserId);
         return {
             "Turma Vinculada": cls?.name || 'N/A',
-            "Tipo de Ação": a.type,
+            "Tipo de Demanda": a.type,
             "Data Inicial": a.startDate,
             "Data Final": a.endDate,
             "Status": a.status,
@@ -325,7 +480,7 @@ const CSActionsView: React.FC = () => {
   const importFields = [
     { key: 'classId', label: '1. Turma Vinculada', required: true },
     { key: 'dummyInfo', label: '2. Ano e Semestre (Derivado da Turma)' },
-    { key: 'type', label: '3. Tipo de Ação', required: true },
+    { key: 'type', label: '3. Tipo de Demanda', required: true },
     { key: 'startDate', label: '4. Data Inicial', required: true },
     { key: 'endDate', label: '5. Data Final', required: true },
     { key: 'status', label: '6. Status da Ação', required: true },
@@ -337,159 +492,217 @@ const CSActionsView: React.FC = () => {
     { key: 'channel', label: '12. Canal', required: true },
   ];
 
-  return (
-    <div className="h-full flex gap-6 overflow-hidden">
-      <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedActionId ? 'w-1/2' : 'w-full'}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Painel de Ações CS</h1>
-            <p className="text-slate-500 font-medium">Monitoramento de engajamento e ROI das comunicações.</p>
-          </div>
-          <div className="flex items-center gap-3">
-             {selectedIds.size > 0 && perms.canDelete && (
-                <button onClick={handleBulkDelete} className="bg-rose-50 border-2 border-rose-200 text-rose-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-rose-100 transition-all animate-in zoom-in-95">
-                    <Trash2 size={18} /> Excluir ({selectedIds.size})
-                </button>
-             )}
-             <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50">
-                <Download size={18} /> Exportar XLS
-             </button>
-             {perms.canInsert && (
-               <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800">
-                  <FileSpreadsheet size={18} /> Importar Planilha
-               </button>
-             )}
-            {perms.canInsert && (
-              <button onClick={() => { setActionToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2">
-                <Plus size={18} /> Nova Operação
-              </button>
-            )}
-          </div>
-        </div>
+  // Resolve a cor do tipo de demanda para exibição
+  const getDemandColor = (typeName: string) => {
+    const dt = demandTypes.find(d => d.name === typeName);
+    return dt?.color || '#94a3b8';
+  };
 
-        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="flex-1 overflow-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
-                  <th className="px-8 py-5 w-10">
-                    <button 
-                      onClick={toggleSelectAll}
-                      className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${selectedIds.size === csActions.length && csActions.length > 0 ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-300'}`}
-                    >
-                      {selectedIds.size === csActions.length && csActions.length > 0 && <Check size={14} strokeWidth={4} />}
-                    </button>
-                  </th>
-                  <th className="px-8 py-5">Campanha / Turma</th>
-                  <th className="px-8 py-5">Consultor</th>
-                  <th className="px-8 py-5">Status</th>
-                  <th className="px-8 py-5 text-right">Financeiro (R$)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {csActions.map(action => (
-                  <tr 
-                    key={action.id} 
-                    className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedIds.has(action.id) ? 'bg-amber-50/50' : ''} ${selectedActionId === action.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''}`}
-                    onClick={() => setSelectedActionId(action.id)}
-                  >
-                    <td className="px-8 py-5" onClick={(e) => { e.stopPropagation(); toggleSelect(action.id); }}>
-                      <button 
-                        className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${selectedIds.has(action.id) ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-300'}`}
-                      >
-                        {selectedIds.has(action.id) && <Check size={14} strokeWidth={4} />}
-                      </button>
-                    </td>
-                    <td className="px-8 py-5">
-                      <div>
-                        <p className="font-black text-slate-900 text-sm leading-tight uppercase group-hover:text-amber-600 transition-colors">{action.type}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">
-                            {classes.find(c => c.id === action.classId)?.name}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                       <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 uppercase">
-                         {users.find(u => u.id === action.responsibleUserId)?.name || 'N/A'}
-                       </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase ${getStatusStyle(action.status)}`}>
-                        {action.status}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                       <p className="text-sm font-black text-emerald-600">R$ {action.revenueResult.toLocaleString()}</p>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase">{action.volumeSold} unidades</p>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  return (
+    <div className="h-full flex flex-col gap-6 overflow-hidden">
+      {/* Header com tabs */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Painel de Ações CS</h1>
+          <p className="text-slate-500 font-medium">Monitoramento de engajamento e ROI das comunicações.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex items-center bg-slate-100 rounded-2xl p-1">
+            <button
+              onClick={() => setActiveTab('painel')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'painel' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <LayoutGrid size={14} /> Painel de Ações CS
+            </button>
+            <button
+              onClick={() => setActiveTab('tipos')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'tipos' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Settings size={14} /> Configurar Tipos de Demanda
+            </button>
           </div>
         </div>
       </div>
 
-      {selectedActionId && selectedAction && (
-        <div className="w-[640px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl overflow-y-auto">
-          <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
-              <Zap size={28} className="text-amber-500" /> Detalhes da Ação
-            </h2>
-            <div className="flex items-center gap-2">
-              {perms.canEdit && <button onClick={() => { setActionToEdit(selectedAction); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>}
-              <button onClick={() => setSelectedActionId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
+      {/* Tab: Configurar Tipos de Demanda */}
+      {activeTab === 'tipos' && <DemandTypesConfig />}
+
+      {/* Tab: Painel de Ações CS */}
+      {activeTab === 'painel' && (
+        <div className="flex gap-6 flex-1 overflow-hidden min-h-0">
+          <div className={`flex-1 flex flex-col gap-4 transition-all overflow-hidden ${selectedActionId ? 'w-1/2' : 'w-full'}`}>
+            {/* Barra de ações */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {selectedIds.size > 0 && perms.canDelete && (
+                <button onClick={handleBulkDelete} className="bg-rose-50 border-2 border-rose-200 text-rose-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-rose-100 transition-all animate-in zoom-in-95">
+                    <Trash2 size={18} /> Excluir ({selectedIds.size})
+                </button>
+              )}
+              <button onClick={handleExportXLS} className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-50">
+                <Download size={18} /> Exportar XLS
+              </button>
+              {perms.canInsert && (
+                <button onClick={() => setIsImportModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-slate-800">
+                  <FileSpreadsheet size={18} /> Importar Planilha
+                </button>
+              )}
+              {perms.canInsert && (
+                <button onClick={() => { setActionToEdit(null); setIsModalOpen(true); }} className="bg-amber-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2">
+                  <Plus size={18} /> Nova Operação
+                </button>
+              )}
+            </div>
+
+            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+                      <th className="px-8 py-5 w-10">
+                        <button
+                          onClick={toggleSelectAll}
+                          className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${selectedIds.size === csActions.length && csActions.length > 0 ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-300'}`}
+                        >
+                          {selectedIds.size === csActions.length && csActions.length > 0 && <Check size={14} strokeWidth={4} />}
+                        </button>
+                      </th>
+                      <th className="px-8 py-5">Tipo de Demanda / Turma</th>
+                      <th className="px-8 py-5">Consultor</th>
+                      <th className="px-8 py-5">Status</th>
+                      <th className="px-8 py-5 text-right">Financeiro (R$)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {csActions.map(action => (
+                      <tr
+                        key={action.id}
+                        className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedIds.has(action.id) ? 'bg-amber-50/50' : ''} ${selectedActionId === action.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''}`}
+                        onClick={() => setSelectedActionId(action.id)}
+                      >
+                        <td className="px-8 py-5" onClick={(e) => { e.stopPropagation(); toggleSelect(action.id); }}>
+                          <button
+                            className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${selectedIds.has(action.id) ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-300'}`}
+                          >
+                            {selectedIds.has(action.id) && <Check size={14} strokeWidth={4} />}
+                          </button>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getDemandColor(action.type) }} />
+                            <div>
+                              <p className="font-black text-slate-900 text-sm leading-tight uppercase group-hover:text-amber-600 transition-colors">{action.type || '—'}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">
+                                  {classes.find(c => c.id === action.classId)?.name}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                           <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 uppercase">
+                             {users.find(u => u.id === action.responsibleUserId)?.name || 'N/A'}
+                           </span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase ${getStatusStyle(action.status)}`}>
+                            {action.status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                           <p className="text-sm font-black text-emerald-600">R$ {action.revenueResult.toLocaleString()}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">{action.volumeSold} unidades</p>
+                        </td>
+                      </tr>
+                    ))}
+                    {csActions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-24 text-center">
+                          <div className="flex flex-col items-center gap-3 opacity-10">
+                            <Zap size={64} />
+                            <p className="font-black uppercase text-xs tracking-widest">Nenhuma ação registrada</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div className="p-8 space-y-10">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Engajamento</p>
-                    <p className="text-2xl font-black text-amber-400">{selectedAction.totalReached} / {selectedAction.totalResponses}</p>
+          {selectedActionId && selectedAction && (
+            <div className="w-[640px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl overflow-y-auto">
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
+                  <Zap size={28} className="text-amber-500" /> Detalhes da Ação
+                </h2>
+                <div className="flex items-center gap-2">
+                  {perms.canEdit && <button onClick={() => { setActionToEdit(selectedAction); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>}
+                  <button onClick={() => setSelectedActionId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
                 </div>
-                <div className="bg-emerald-600 p-6 rounded-[2rem] text-white">
-                    <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Faturamento</p>
-                    <p className="text-2xl font-black">R$ {selectedAction.revenueResult.toLocaleString()}</p>
-                </div>
-             </div>
+              </div>
 
-             <section className="space-y-6">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><MessageSquare size={14}/> Timeline de Atividades</h4>
-                <form onSubmit={handleAddActivity} className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-200">
-                    <textarea 
-                        className="w-full p-4 text-sm border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none min-h-[100px] bg-white font-bold shadow-inner"
-                        placeholder="O que aconteceu hoje?..."
-                        value={newActivityText}
-                        onChange={(e) => setNewActivityText(e.target.value)}
-                    />
-                    <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 flex items-center justify-center gap-2">
-                        <Send size={14} /> Registrar Nota
+              <div className="p-8 space-y-10">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Engajamento</p>
+                        <p className="text-2xl font-black text-amber-400">{selectedAction.totalReached} / {selectedAction.totalResponses}</p>
+                    </div>
+                    <div className="bg-emerald-600 p-6 rounded-[2rem] text-white">
+                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Faturamento</p>
+                        <p className="text-2xl font-black">R$ {selectedAction.revenueResult.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                {/* Info do tipo de demanda */}
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: getDemandColor(selectedAction.type) }} />
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo de Demanda</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">{selectedAction.type || '—'}</p>
+                  </div>
+                </div>
+
+                <section className="space-y-6">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><MessageSquare size={14}/> Timeline de Atividades</h4>
+                  <form onSubmit={handleAddActivity} className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-200">
+                      <textarea
+                          className="w-full p-4 text-sm border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none min-h-[100px] bg-white font-bold shadow-inner"
+                          placeholder="O que aconteceu hoje?..."
+                          value={newActivityText}
+                          onChange={(e) => setNewActivityText(e.target.value)}
+                      />
+                      <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 flex items-center justify-center gap-2">
+                          <Send size={14} /> Registrar Nota
+                      </button>
+                  </form>
+
+                  <div className="space-y-4">
+                      {selectedAction.activities.map(activity => (
+                          <div key={activity.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+                              <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[10px] font-black text-slate-700 uppercase">{activity.userName}</span>
+                                  <span className="text-[9px] font-bold text-slate-400">{activity.timestamp}</span>
+                              </div>
+                              <p className="text-xs font-bold text-slate-600 leading-relaxed">{activity.description}</p>
+                          </div>
+                      ))}
+                  </div>
+                </section>
+
+                {perms.canDelete && (
+                  <div className="pt-6 border-t border-slate-100">
+                    <button
+                      onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a ação "${selectedAction.type}" para a Lixeira?`, onConfirm: () => { moveToTrash('csAction', [selectedAction.id]); setSelectedActionId(null); setConfirmConfig(null); } })}
+                      className="w-full py-5 border-2 border-rose-100 text-rose-500 rounded-3xl font-black uppercase tracking-widest hover:bg-rose-50 flex items-center justify-center gap-3"
+                    >
+                      <Trash2 size={18}/> Excluir Ação
                     </button>
-                </form>
-
-                <div className="space-y-4">
-                    {selectedAction.activities.map(activity => (
-                        <div key={activity.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-black text-slate-700 uppercase">{activity.userName}</span>
-                                <span className="text-[9px] font-bold text-slate-400">{activity.timestamp}</span>
-                            </div>
-                            <p className="text-xs font-bold text-slate-600 leading-relaxed">{activity.description}</p>
-                        </div>
-                    ))}
-                </div>
-             </section>
-
-             {perms.canDelete && <div className="pt-6 border-t border-slate-100">
-                 <button
-                    onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover a ação "${selectedAction.title}" para a Lixeira?`, onConfirm: () => { moveToTrash('csAction', [selectedAction.id]); setSelectedActionId(null); setConfirmConfig(null); } })}
-                    className="w-full py-5 border-2 border-rose-100 text-rose-500 rounded-3xl font-black uppercase tracking-widest hover:bg-rose-50 flex items-center justify-center gap-3"
-                 >
-                    <Trash2 size={18}/> Excluir Ação
-                 </button>
-             </div>}
-          </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -502,7 +715,6 @@ const CSActionsView: React.FC = () => {
           onImport={handleBulkImport}
         />
       )}
-
       {confirmConfig && (
         <ConfirmModal
           title={confirmConfig.title}
