@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-07 (Sessão 10 — concluída)
+> Atualizado em: 2026-06-07 (Sessão 11 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -705,22 +705,141 @@ export interface ClassProduct {
 
 ---
 
-## 🗺️ Próximos passos (Sessão 11+)
+---
 
-### 1. Testes gerais do sistema
-- Validar todas as telas com RLS ativa (login com usuário real, verificar que dados não vazam entre tenants)
-- Testar fluxo completo: cadastro → negociação → venda → relatório
-- Verificar importação em massa, restauração da lixeira e backup com RLS ativa
+## ✅ Sessão 11 — Bug Fix IDs + Multi-usuário + Criação de Usuários pelo CRM (2026-06-07)
 
-### 2. Deploy em produção
-- Build `npm run build` + deploy do `dist/` em CDN estática (Vercel / Netlify / S3)
-- Configurar variáveis de ambiente de produção
-- Verificar HashRouter funcionando no host de destino
-- Deploy da Edge Function `auto-backup` no Supabase
+### 🐛 Bug Fix — IDs não-UUID em 12 pontos (causa: clientes sumiam ao recarregar)
 
-### 3. Integração WhatsApp + Agente ARES
+**Causa raiz:** colunas `UUID NOT NULL` no Supabase rejeitam silenciosamente inserts com IDs no formato `cli-${Date.now()}`, `act-${Date.now()}` etc. O optimistic update mostrava o dado na UI, mas ele nunca persistia — na próxima recarga a lista aparecia vazia.
+
+**Arquivos e pontos corrigidos (`Date.now()` / `Math.random()` → `crypto.randomUUID()`):**
+
+| Arquivo | Pontos corrigidos |
+|---|---|
+| `pages/Clients.tsx` | `clients.id` (bulk import), `product_negotiations.id` (bulk import), `sales.id` (bulk import) |
+| `pages/Funnel.tsx` | `clients.id` (novo lead), `client_activities.id` (novo lead), `client_activities.id` (mover lead), `client_activities.id` (venda rápida), `client_activities.id` (perda rápida) |
+| `pages/Admin/Eventos.tsx` | `event_activities.id` (nova atividade) |
+| `pages/Admin/Turmas.tsx` | `class_products.id` (edit), `class_products.id` (novo) |
+| `store.tsx` | `class_products.id` (fallback em `addClassProduct`), `client_activities.id` (fallback em `addClientActivity`), `client_activities.id` (vínculo CS em `addCsDailyService`) |
+
+**IDs de lixeira (`trash-${Date.now()}`) mantidos** — são localStorage-only, nunca vão ao Supabase.
+
+---
+
+### 🏢 Arquitetura Multi-Usuário — `organizations` + `user_organizations`
+
+**Problema:** RLS usava `auth.uid()` como `tenant_id`, então apenas o usuário que criou os dados conseguia vê-los. Karem (CONSULTOR) e Luana (VISUALIZADOR) da mesma empresa não enxergavam os dados do Flavio (ADMIN).
+
+**SQL gerado e aplicado (5 blocos):**
+
+**Novas tabelas:**
+```sql
+CREATE TABLE public.organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public.user_organizations (
+  user_id        UUID     NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  org_id         UUID     NOT NULL REFERENCES public.organizations (id) ON DELETE CASCADE,
+  is_super_admin BOOLEAN  NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (user_id, org_id)
+);
+-- Índices: idx_user_organizations_user, idx_user_organizations_org
+```
+
+**Funções helper para RLS (STABLE + SECURITY DEFINER):**
+```sql
+-- Retorna org_id do usuário autenticado (lookup O(1) via índice)
+CREATE OR REPLACE FUNCTION public.current_org_id() RETURNS UUID ...
+
+-- Retorna true se o usuário tem is_super_admin = true
+CREATE OR REPLACE FUNCTION public.is_super_admin() RETURNS BOOLEAN ...
+```
+
+**Políticas RLS reescritas em todas as 27 tabelas:**
+```sql
+-- Tabelas com tenant_id direto (23 tabelas):
+USING (public.is_super_admin() OR tenant_id = public.current_org_id())
+WITH CHECK (public.is_super_admin() OR tenant_id = public.current_org_id())
+
+-- Junction tables (class_courses, funnel_responsible_users):
+EXISTS (...tabela pai... AND tenant_id = public.current_org_id())
+  OR public.is_super_admin()
+```
+
+**Estratégia zero-migração de dados:**
+- `organizations.id` = UUID já existente como `tenant_id` nas tabelas
+- Nenhuma linha nas 25 tabelas precisou ser alterada
+- Adicionar novo colaborador à empresa = 1 INSERT em `user_organizations`
+
+**`flavio.oliveira@grupo.top`** cadastrado com `is_super_admin = TRUE` → bypassa todas as políticas.
+
+---
+
+### 👤 Criação de Usuários pelo CRM — Edge Function `create-user`
+
+**Arquitetura:**
+```
+Frontend (Admin) → supabase.functions.invoke('create-user') → Edge Function
+  → verifica JWT + role ADMIN
+  → lê org_id do chamador em user_organizations
+  → auth.admin.createUser (service_role)  ← requer service_role key (nunca exposta no frontend)
+  → INSERT public.users (mesmo UUID do Auth)
+  → INSERT user_organizations
+  → retorna { id, email, name, phone, role, status }
+```
+
+**`supabase/functions/create-user/index.ts`** *(novo)*
+- Valida JWT do chamador via `supabase.auth.getUser(token)`
+- Verifica `role = 'ADMIN'` na tabela `users`
+- `email_confirm: true` — confirma email automaticamente (sem link)
+- Rollback automático: se INSERT em `users` falhar, deleta o Auth user criado
+- INSERT em `user_organizations` não-fatal (tabela pode estar em transição)
+- Erros descritivos em português com status HTTP corretos (401/403/400/422/500)
+- Deploy: `supabase functions deploy create-user`
+
+**`pages/Admin/Users.tsx`** *(reescrito)*
+- Removido `GenericRegistry` — tabela própria com controle total
+- `UserModal` modo **criar**: todos os campos + campo senha; chama Edge Function via `supabase.functions.invoke`
+- `UserModal` modo **editar**: email readonly + aviso, senha oculta; chama `updateUser` do store
+- Loading spinner + erro inline em ambos os modos (zero `alert()`)
+- Botão **"Resetar"** por linha → `supabase.auth.resetPasswordForEmail()` com feedback visual (idle → sending → sent/error → idle após 4s)
+- Botão editar (lápis) e excluir (lixeira) por linha
+- Excluir usa `ConfirmModal` (padrão do projeto)
+- Usuário logado não pode se autoexcluir
+- Cards de roles expandidos para 4 níveis (Admin / Gestor / Consultor / Visualizador)
+
+**`store.tsx`** *(atualizado)*
+- `addUser` **removido** da interface `DataContext`, implementação e valor do contexto
+- `updateUser` **corrigido**: persiste apenas `name`, `role`, `phone`, `status` — nunca email nem senha (gerenciados pelo Supabase Auth)
+- Estado local atualizado via `setUsers` direto em `Users.tsx` após resposta da Edge Function
+
+---
+
+## 🗺️ Próximos passos (Sessão 12+)
+
+### 1. Deploy das Edge Functions
+- `supabase functions deploy create-user`
+- `supabase functions deploy auto-backup`
+- Verificar variáveis de ambiente no painel Supabase (SUPABASE_SERVICE_ROLE_KEY é automática)
+
+### 2. Automações do funil
+- Notificações automáticas ao mover card entre etapas
+- Regras de SLA por etapa (ex.: alertar se lead ficou X dias parado)
+- Relatório de conversão por etapa / por consultor
+
+### 3. Melhorias do Dashboard
+- Gráfico de evolução de vendas por período
+- Top consultores por volume e valor
+- Taxa de conversão por turma / instituição
+- Indicadores de CS (atendimentos por tipo de demanda)
+
+### 4. Integração WhatsApp + Agente ARES
 - Definir arquitetura de integração (webhook WhatsApp → Supabase → CRM)
-- Agente ARES: acesso aos dados do CRM via API / Edge Functions
+- Agente ARES: acesso aos dados do CRM via Edge Functions
 - Fluxo de atendimento automatizado conectado ao `cs_daily_services`
 
 ---
@@ -761,4 +880,13 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 
 12. **`class_products.plan_name` e `class_products.lot_type`** — colunas adicionadas manualmente na Sessão 10. Ambas opcionais (nullable, sem default). `lot_type` tem CHECK constraint com 10 valores válidos.
 
-13. **RLS e `auth.uid()`** — todas as políticas usam `auth.uid()`, não `current_setting`. A função `set_tenant_id()` existe no banco mas não é chamada pelo cliente — o JWT resolve automaticamente via PostgREST.
+13. **RLS — arquitetura multi-usuário (Sessão 11):** políticas usam `public.current_org_id()` e `public.is_super_admin()`. O `tenant_id` nas tabelas = `org_id` da organização (não mais `auth.uid()` individual). Adicionar colaborador = INSERT em `user_organizations(user_id, org_id)`.
+
+14. **`addUser` removido do store (Sessão 11)** — criação de usuários passa pela Edge Function `create-user`. Estado local atualizado via `setUsers` direto em `Users.tsx`. `updateUser` persiste apenas `name`, `role`, `phone`, `status`.
+
+15. **Edge Functions disponíveis:**
+    - `supabase/functions/auto-backup/index.ts` — backup automático agendado
+    - `supabase/functions/create-user/index.ts` — criação de usuário com Auth + tabela + org
+    - Deploy: `supabase functions deploy <nome>`
+
+16. **IDs — regra absoluta:** sempre `crypto.randomUUID()` para qualquer entidade que vá ao Supabase. `Date.now()` e `Math.random()` só são aceitáveis para IDs de localStorage (ex.: `trash-${Date.now()}`).

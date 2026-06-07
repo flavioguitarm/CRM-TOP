@@ -63,7 +63,6 @@ interface DataContextType {
   addCourse: (data: Omit<Course, 'id' | 'createdAt'>) => Promise<void>;
   updateCourse: (course: Course) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
-  addUser: (data: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
   updateUser: (user: User) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   addProductCategory: (data: Omit<ProductCategory, 'id' | 'createdAt'>) => Promise<void>;
@@ -1268,22 +1267,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── users ───────────────────────────────────────────────────────────────────
 
-  const addUser = async (data: Omit<User, 'id' | 'createdAt'>) => {
-    if (!tenantId) return;
-    const { data: row, error } = await supabase
-      .from('users')
-      .insert({ tenant_id: tenantId, name: data.name, email: data.email, role: data.role, phone: data.phone ?? '', password: data.password ?? '', status: data.status ?? 'ATIVO' })
-      .select('id, name, email, role, phone, password, status, created_at')
-      .single();
-    if (error) { console.error('addUser:', error.message); return; }
-    setUsers(prev => [...prev, { id: row.id, name: row.name, email: row.email, role: row.role as UserRole, phone: row.phone ?? '', password: row.password ?? '', status: row.status as 'ATIVO' | 'INATIVO', createdAt: row.created_at?.split('T')[0] ?? today }]);
-  };
+  // addUser foi removido — criação de usuários agora passa pela
+  // Edge Function create-user (que usa service_role para criar no Auth).
+  // O estado local é atualizado diretamente via setUsers em Users.tsx.
 
   const updateUser = async (user: User) => {
     if (!tenantId) return;
+    // Apenas persiste campos editáveis — email e senha são gerenciados pelo Supabase Auth
     const { error } = await supabase
       .from('users')
-      .update({ name: user.name, email: user.email, role: user.role, phone: user.phone ?? '', password: user.password ?? '', status: user.status })
+      .update({
+        name:   user.name,
+        role:   user.role,
+        phone:  user.phone ?? '',
+        status: user.status,
+      })
       .eq('id', user.id)
       .eq('tenant_id', tenantId);
     if (error) { console.error('updateUser:', error.message); return; }
@@ -2225,7 +2223,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateClientStage, addClientActivity, addClient, updateClient,
       addInstitution, updateInstitution, deleteInstitution,
       addCourse, updateCourse, deleteCourse,
-      addUser, updateUser, deleteUser,
+      updateUser, deleteUser,
       addProductCategory, updateProductCategory, deleteProductCategory,
       addProduct, updateProduct, deleteProduct,
       addActivityType, updateActivityType, deleteActivityType,
