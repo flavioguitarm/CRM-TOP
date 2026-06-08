@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ChannelType, ProjectClass } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ChannelType, ProjectClass, ProjectActivity } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -113,11 +113,14 @@ interface DataContextType {
   addCSDailyService: (service: CSDailyService) => void;
   updateCSDailyService: (service: CSDailyService) => void;
   deleteCSDailyService: (id: string) => void;
-  // ── Turmas do Projeto ─────────────────────────────────��─────────────────────
+  // ── Turmas do Projeto ─────────────────────────────────────────────────────
   projectClasses: ProjectClass[];
   addProjectClass: (projectId: string, name: string) => Promise<void>;
   updateProjectClass: (id: string, name: string) => Promise<void>;
   deleteProjectClass: (id: string) => Promise<void>;
+  // ── Timeline de Projetos ───────────────────────────────────────────────────
+  projectActivities: ProjectActivity[];
+  addProjectActivity: (projectId: string, entry: Omit<ProjectActivity, 'id' | 'projectId'>) => Promise<void>;
   resetDatabase: () => void;
   exportDatabase: () => string;
   importDatabase: (jsonData: string) => void;
@@ -394,6 +397,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [courses, setCourses]           = useState<Course[]>([]);
   const [classes, setClasses]           = useState<ClassRoom[]>([]);
   const [projectClasses, setProjectClasses] = useState<ProjectClass[]>([]);
+  const [projectActivities, setProjectActivities] = useState<ProjectActivity[]>([]);
   const [funnels, setFunnels]           = useState<Funnel[]>([]);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts]         = useState<Product[]>([]);
@@ -454,6 +458,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           projectId: r.project_id,
           name: r.name,
           createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: project_activities
+  useEffect(() => {
+    if (!tenantId) { setProjectActivities([]); return; }
+    supabase
+      .from('project_activities')
+      .select('id, project_id, type, description, user_id, timestamp')
+      .eq('tenant_id', tenantId)
+      .order('timestamp', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('project_activities fetch:', error.message); return; }
+        setProjectActivities((data ?? []).map(r => ({
+          id: r.id,
+          projectId: r.project_id,
+          type: r.type ?? 'note',
+          description: r.description ?? '',
+          userId: r.user_id ?? undefined,
+          timestamp: r.timestamp ?? new Date().toISOString(),
         })));
       });
   }, [tenantId]);
@@ -1147,16 +1172,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addClientActivity = (clientId: string, activity: any) => {
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, activities: [activity, ...c.activities] } : c));
+    const enriched = { ...activity, userId: activity.userId ?? currentUser?.id };
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, activities: [enriched, ...c.activities] } : c));
     if (tenantId) {
       supabase.from('client_activities').insert({
-        id:          activity.id || crypto.randomUUID(),
+        id:          enriched.id || crypto.randomUUID(),
         tenant_id:   tenantId,
         client_id:   clientId,
-        type:        activity.type,
-        description: activity.description ?? '',
+        type:        enriched.type,
+        description: enriched.description ?? '',
         timestamp:   new Date().toISOString(),
-        attachments: activity.attachments ?? [],
+        attachments: enriched.attachments ?? [],
+        user_id:     enriched.userId ?? null,
       }).then(({ error }) => { if (error) console.error('addClientActivity:', error.message); });
     }
   };
@@ -1696,6 +1723,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .delete()
       .eq('id', id).eq('tenant_id', tenantId);
     if (error) console.error('deleteProjectClass:', error.message);
+  };
+
+  // ── Timeline de Projetos (project_activities) ──────────────────────────────
+  const addProjectActivity = async (projectId: string, entry: Omit<ProjectActivity, 'id' | 'projectId'>) => {
+    if (!tenantId) return;
+    const id = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+    const newEntry: ProjectActivity = { id, projectId, ...entry, timestamp };
+    setProjectActivities(prev => [newEntry, ...prev]);
+    const { error } = await supabase.from('project_activities').insert({
+      id,
+      project_id: projectId,
+      tenant_id:  tenantId,
+      type:       entry.type ?? 'note',
+      description: entry.description,
+      user_id:    entry.userId ?? currentUser?.id ?? null,
+      timestamp,
+    });
+    if (error) {
+      console.error('addProjectActivity:', error.message);
+      setProjectActivities(prev => prev.filter(a => a.id !== id));
+    }
   };
 
   const addFunnel = (funnel: Funnel) => {
@@ -2387,6 +2436,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addCSAction, updateCSAction, addCSActionActivity, deleteCSAction,
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
       projectClasses, addProjectClass, updateProjectClass, deleteProjectClass,
+      projectActivities, addProjectActivity,
       resetDatabase, exportDatabase, importDatabase,
       exportAllData, importAllData, resetAllData,
       backupSettings, loadBackupSettings, saveBackupSettings,

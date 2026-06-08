@@ -11,6 +11,7 @@ import {
 import { Activity, UserRole, Task, ProductNegotiation, Sale } from '../types';
 import * as XLSX from 'xlsx';
 import ConfirmModal from './ConfirmModal';
+import ActivityTimeline from './ActivityTimeline';
 
 interface Props {
   clientId: string;
@@ -57,15 +58,14 @@ const HistoryModal: React.FC<{ activities: Activity[]; onClose: () => void; clie
 );
 
 const ClientProfileView: React.FC<Props> = ({ clientId }) => {
-  const { 
-    clients, institutions, courses, classes, currentUser, 
+  const {
+    clients, institutions, courses, classes, currentUser, users,
     addClientActivity, products, sales, addSale, updateSale, deleteSale,
     negotiations, addNegotiation, deleteNegotiation, updateNegotiationStatus,
     tasks, addTask, toggleTask, deleteTask
   } = useData();
 
   const [newActivity, setNewActivity] = useState({ description: '', type: 'note' as any });
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [customPrice, setCustomPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -120,17 +120,15 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
   }, [clientNegotiations, clientSales, allowedClassProducts]);
   const clientTasks = useMemo(() => tasks.filter(t => t.clientId === client.id).sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), [tasks, client.id]);
 
-  const handleAddActivity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newActivity.description) return;
+  const handleAddActivity = (text: string, type?: Activity['type']) => {
+    if (!text) return;
     const activity: Activity = {
-      id: Date.now().toString(),
-      type: newActivity.type,
-      description: newActivity.description,
-      timestamp: new Date().toLocaleString('pt-BR'),
+      id: crypto.randomUUID(),
+      type: type ?? 'note',
+      description: text,
+      timestamp: new Date().toISOString(),
     };
     addClientActivity(client.id, activity);
-    setNewActivity({ description: '', type: 'note' });
   };
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -256,8 +254,6 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
     // Deleta o registro
     deleteNegotiation(neg.id);
   };
-
-  const visibleActivities = client.activities.slice(0, 3);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -509,81 +505,29 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
           })()}
         </section>
 
-        {/* Histórico de Atividades */}
-        <section className="space-y-6 pt-6 border-t border-slate-100">
+        {/* Timeline de Atividades */}
+        <section className="space-y-4 pt-6 border-t border-slate-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                <MessageSquare size={14} className="text-amber-500" /> Atividades
-                </h4>
-                <button 
-                    onClick={handleExportActivities}
-                    title="Exportar Atividades (Excel)"
-                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                >
-                    <Download size={16} />
-                </button>
-            </div>
-            {client.activities.length > 3 && (
-              <button 
-                onClick={() => setIsHistoryModalOpen(true)}
-                className="text-[10px] font-black text-amber-600 hover:text-amber-700 uppercase tracking-widest"
-              >
-                Ver Todas
-              </button>
-            )}
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <MessageSquare size={14} className="text-amber-500" /> Atividades
+            </h4>
+            <button
+              onClick={handleExportActivities}
+              title="Exportar Atividades (Excel)"
+              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+            >
+              <Download size={16} />
+            </button>
           </div>
-
-          {!isVisualizador && (
-            <form onSubmit={handleAddActivity} className="space-y-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-              <textarea 
-                className="w-full p-4 text-xs border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 focus:outline-none min-h-[100px] bg-white font-medium shadow-inner"
-                placeholder="Ex: Cliente demonstrou interesse no álbum de luxo..."
-                value={newActivity.description}
-                onChange={(e) => setNewActivity(p => ({...p, description: e.target.value}))}
-              />
-              <div className="flex items-center justify-between">
-                <select 
-                    className="text-[10px] font-black uppercase border border-slate-200 rounded-xl px-4 py-2 bg-white text-slate-600 outline-none focus:ring-2 focus:ring-amber-500 shadow-inner"
-                    value={newActivity.type}
-                    onChange={(e) => setNewActivity(p => ({...p, type: e.target.value as any}))}
-                  >
-                    <option value="note">Nota Interna</option>
-                    <option value="call">Ligação</option>
-                    <option value="email">E-mail</option>
-                    <option value="meeting">Reunião</option>
-                </select>
-                <button className="bg-amber-500 text-white px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 shadow-lg shadow-amber-200 transition-all">
-                  Salvar Nota
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="space-y-4">
-            {visibleActivities.map(activity => (
-              <div key={activity.id} className="relative pl-8 pb-4 border-l-2 border-slate-100 last:border-0">
-                <div className="absolute -left-[9px] top-0 w-4 h-4 bg-white border-4 border-amber-500 rounded-full shadow-sm" />
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest">{activity.type}</span>
-                    <span className="text-[9px] font-bold text-slate-400">{activity.timestamp}</span>
-                  </div>
-                  <p className="text-xs text-slate-700 font-bold leading-relaxed">{activity.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ActivityTimeline
+            entries={client.activities}
+            users={users}
+            onAddNote={isVisualizador ? undefined : handleAddActivity}
+            isReadOnly={isVisualizador}
+            maxVisible={5}
+          />
         </section>
       </div>
-
-      {isHistoryModalOpen && (
-        <HistoryModal 
-          activities={client.activities} 
-          onClose={() => setIsHistoryModalOpen(false)} 
-          clientName={client.name} 
-        />
-      )}
 
       {pendingDeleteNeg && (
         <ConfirmModal

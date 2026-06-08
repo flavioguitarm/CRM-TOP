@@ -253,10 +253,20 @@ export interface Client {
 
 export interface Activity {
   id: string;
-  type: 'call' | 'email' | 'meeting' | 'note';
+  type: 'call' | 'email' | 'meeting' | 'note' | 'move' | 'sale';
   description: string;
   timestamp: string;
   attachments?: string[];
+  userId?: string;
+}
+
+export interface ProjectActivity {
+  id: string;
+  projectId: string;
+  type: 'note' | 'call' | 'email' | 'meeting';
+  description: string;
+  userId?: string;
+  timestamp: string;
 }
 
 export interface Sale {

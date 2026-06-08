@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-07 (Sessão 11 — concluída)
+> Atualizado em: 2026-06-08 (Sessão 13 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1009,28 +1009,120 @@ Substituído layout baseado em `GenericRegistry` por:
 
 ---
 
-## 🗺️ Próximos passos (Sessão 13+)
+## ✅ Sessão 13 — Fix Atendimentos + Painel de Detalhes Global (2026-06-08)
 
-### 1. Timeline de Atividades
-- Adicionar seção "Histórico / Timeline" em todos os painéis de detalhes
-- Clientes, Projetos (Turmas), Painel de Ações, Instituições
-- Formato: lista cronológica com tipo de atividade + autor + timestamp
+### 🐛 Bug Fix — `addCSDailyService` não persistia após reload
+
+**Causa raiz 1:** `responsible_user_id` era `NOT NULL` no banco mas o código enviava um valor que não existia na tabela `users` (o `currentUser.id` é o auth.uid, nem sempre cadastrado na tabela pública `users`), causando FK constraint violation silenciosa.
+
+**Causa raiz 2:** `addCSDailyService` era fire-and-forget — erros do Supabase não revertiam o optimistic update nem alertavam o usuário.
+
+**Causa raiz 3:** `cs_actions` SELECT no fetch não incluía a coluna `cost` (adicionada na Sessão 12), fazendo o campo sempre mostrar 0 após reload.
+
+**SQL aplicado no Supabase:**
+```sql
+-- Torna opcionais os campos FK de cs_daily_services
+ALTER TABLE public.cs_daily_services
+  ALTER COLUMN responsible_user_id DROP NOT NULL,
+  ALTER COLUMN client_id           DROP NOT NULL,
+  ALTER COLUMN class_id            DROP NOT NULL,
+  ALTER COLUMN demand_type_id      DROP NOT NULL;
+
+-- RLS corrigida para usar current_org_id() em vez de auth.uid()
+DROP POLICY IF EXISTS tenant_isolation ON public.cs_daily_services;
+CREATE POLICY tenant_isolation ON public.cs_daily_services
+  FOR ALL
+  USING  (public.is_super_admin() OR tenant_id = public.current_org_id())
+  WITH CHECK (public.is_super_admin() OR tenant_id = public.current_org_id());
+
+-- SQL da Timeline (aplicado no início da sessão)
+ALTER TABLE public.client_activities ADD COLUMN IF NOT EXISTS user_id UUID;
+
+CREATE TABLE IF NOT EXISTS public.project_activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL,
+  type TEXT NOT NULL DEFAULT 'note',
+  description TEXT NOT NULL,
+  user_id UUID,
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.project_activities ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tenant_isolate_project_activities" ON public.project_activities
+  USING (tenant_id = current_org_id()) WITH CHECK (tenant_id = current_org_id());
+```
+
+**Fixes em `store.tsx`:**
+- `addCSDailyService` → async + rollback no erro + `alert()` com mensagem real
+- Validação de FKs antes de qualquer insert/update: `responsible_user_id`, `client_id`, `class_id`, `demand_type_id` validados contra estado local (se ID não existir → `null`)
+- Mesmo padrão aplicado em `updateCSDailyService`
+- `cost` adicionado ao SELECT de `cs_actions` (estava faltando desde Sessão 12)
+
+---
+
+### 🎨 Padrão Painel de Detalhes — aplicado em todos os módulos faltantes
+
+**Padrão oficial consolidado:**
+- Card `rounded-[2.5rem] border border-slate-200 shadow-sm bg-white`
+- `flex-shrink-0` com largura fixa (`w-[380–580px]`)
+- Sem backdrop / sem overlay
+- Toggle: clicar no mesmo item fecha (`prev === id ? null : id`)
+- Animação: `animate-in slide-in-from-right-4 duration-200`
+- Cabeçalho: título + botões [Editar] [Excluir] [Fechar]
+- Container pai: `flex gap-4` com lista `flex-1 min-w-0`
+
+**Módulos atualizados nesta sessão:**
+
+| Módulo | Arquivo | Toggle | Card arredondado | Trash no header | duration-200 |
+|--------|---------|:------:|:----------------:|:---------------:|:------------:|
+| Atendimentos Diários | `CSDailyServices.tsx` | ✅ já tinha | ✅ já tinha | ✅ adicionado | ✅ já tinha |
+| Catálogo de Vendas | `Admin/Produtos.tsx` | ✅ adicionado | ✅ migrado | ✅ adicionado | ✅ corrigido |
+| Cronograma Mestre | `Admin/Eventos.tsx` | ✅ adicionado | ✅ migrado | ✅ movido do rodapé | ✅ corrigido |
+| Negociações (Kanban) | `Funnel.tsx` | ✅ adicionado | ✅ adicionado | ✅ adicionado | ✅ corrigido |
+
+**Observação Funnel:** por ser Kanban com scroll horizontal, o painel usa `fixed right-6 top-24 bottom-6 z-[100] w-[480px]` — flutua sobre o kanban sem encolher as colunas. Sem backdrop. O ClientProfileView é exibido dentro do painel.
+
+**Módulos já com padrão aplicado (Sessões anteriores):**
+- `Clients.tsx`, `CSActions.tsx`, `Admin/Instituicoes.tsx`, `Admin/Turmas.tsx`, `Admin/FunnelConfig.tsx`, `Agenda.tsx`
+
+---
+
+## 🗺️ Próximos passos (Sessão 14+)
+
+### 1. Timeline de Atividades (plano aprovado — SQL já aplicado)
+
+**Infraestrutura já pronta:**
+- `client_activities.user_id UUID` — coluna adicionada
+- `project_activities` — tabela criada com RLS
+
+**O que falta implementar:**
+
+| # | Arquivo | Mudança |
+|---|---------|---------|
+| 1 | `types.ts` | Adicionar `userId?: string` em `Activity`; novo interface `ProjectActivity` |
+| 2 | `components/ActivityTimeline.tsx` | **Novo** — recebe `entries: Activity[]`, `users: User[]`, `onAddNote: (text) => void`, `isReadOnly?: boolean` |
+| 3 | `store.tsx` | `addClientActivity` passa `user_id: currentUser?.id`; adiciona `projectActivities`, fetch e `addProjectActivity` |
+| 4 | `components/ClientProfileView.tsx` | Substitui seção "Histórico de Atividades" pelo `<ActivityTimeline>` |
+| 5 | `pages/Admin/Turmas.tsx` | Adiciona seção "Notas / Timeline" no painel de detalhes |
+
+**Visual do componente:**
+- Ícone por tipo: `MessageSquare` (note), `Phone` (call), `Mail` (email), `Users` (meeting), `ArrowRight` (movimentação), `DollarSign` (venda)
+- Linha vertical conectando entradas (timeline clássica)
+- Avatar/nome do usuário por entrada
+- Campo de nota fixo no final
+- Paleta slate/amber consistente com o restante do sistema
 
 ### 2. Dashboard melhorado
 - Custos × Faturamento por período (gráfico de barras)
 - Campanhas em destaque (top ações CS por ROI)
 - Indicadores de conversão por funil
 
-### 3. Verificação cruzada Atendimentos × Clientes
-- Na tela de Atendimentos Diários, vincular automaticamente ao cliente pelo telefone
-- Alerta se telefone não encontrado em nenhum cliente cadastrado
-
-### 4. Deploy online
+### 3. Deploy online
 - Build de produção + hospedagem (Vercel / Netlify / servidor próprio)
 - Configurar variáveis de ambiente de produção
 - Testar RLS em ambiente limpo
 
-### 5. Deploy das Edge Functions (pendente desde Sessão 11)
+### 4. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
 
@@ -1083,7 +1175,7 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 
 16. **IDs — regra absoluta:** sempre `crypto.randomUUID()` para qualquer entidade que vá ao Supabase. `Date.now()` e `Math.random()` só são aceitáveis para IDs de localStorage (ex.: `trash-${Date.now()}`).
 
-17. **Painel de Detalhes — padrão oficial (Sessão 12):** sem backdrop, card `rounded-[2.5rem]` flutuante, toggle no click (clicar no mesmo item fecha), `animate-in slide-in-from-right-4 duration-200`. Aplicado em: FunnelConfig, Agenda, Clients, CSActions, Instituicoes, Turmas.
+17. **Painel de Detalhes — padrão oficial (Sessões 12–13):** sem backdrop, card `rounded-[2.5rem]` flutuante, toggle no click (clicar no mesmo item fecha), `animate-in slide-in-from-right-4 duration-200`, cabeçalho com [Editar][Excluir][Fechar]. Aplicado em **todos os módulos**: FunnelConfig, Agenda, Clients, CSActions, Instituicoes, Turmas, CSDailyServices, Produtos, Eventos, Funnel. **Exceção Funnel:** painel usa `fixed right-6 top-24 bottom-6` por ser Kanban com scroll horizontal.
 
 18. **`project_classes` (Sessão 12):** tabela nova `public.project_classes` com `project_id` FK para `classes`. CRUD no store (`addProjectClass`, `updateProjectClass`, `deleteProjectClass`) com optimistic update + rollback. Interface `ProjectClass` em `types.ts`.
 

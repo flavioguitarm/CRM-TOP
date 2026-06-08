@@ -5,9 +5,10 @@ import { useData } from '../../store';
 import {
   Plus, GraduationCap, Calendar as CalendarIcon, Clock, X, Check, Building2, Trash2, Edit3,
   ShoppingCart, Tag, DollarSign, Target, TrendingUp, FileSpreadsheet, Download, ExternalLink,
-  User, Briefcase, Zap, CheckSquare, Square, Users, Pencil, Save, GitBranch
+  User, Briefcase, Zap, CheckSquare, Square, Users, Pencil, Save, GitBranch, MessageSquare
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
+import ActivityTimeline from '../../components/ActivityTimeline';
 import ConfirmModal from '../../components/ConfirmModal';
 import HelpTooltip from '../../components/HelpTooltip';
 import { ClassRoom, ClassProduct } from '../../types';
@@ -351,7 +352,7 @@ const ClassProductModal: React.FC<{
 };
 
 const TurmasAdmin: React.FC = () => {
-  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users, projectClasses, addProjectClass, updateProjectClass, deleteProjectClass, funnels, addFunnel } = useData();
+  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users, projectClasses, addProjectClass, updateProjectClass, deleteProjectClass, funnels, addFunnel, projectActivities, addProjectActivity, currentUser } = useData();
   const navigate = useNavigate();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -957,6 +958,27 @@ const TurmasAdmin: React.FC = () => {
                   </p>
                 )}
               </div>
+            </section>
+
+            {/* ── Timeline / Notas do Projeto ──────────────────────────────── */}
+            <section className="space-y-4 pt-6 border-t border-slate-100">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <MessageSquare size={14} className="text-amber-500" /> Timeline / Notas
+              </h4>
+              <ActivityTimeline
+                entries={projectActivities.filter(a => a.projectId === selectedClassId)}
+                users={users}
+                onAddNote={(text, type) => {
+                  if (!selectedClassId) return;
+                  addProjectActivity(selectedClassId, {
+                    type: (type ?? 'note') as any,
+                    description: text,
+                    userId: currentUser?.id,
+                    timestamp: new Date().toISOString(),
+                  });
+                }}
+                maxVisible={5}
+              />
             </section>
 
             <section className="space-y-6 pt-6 border-t border-slate-100">
