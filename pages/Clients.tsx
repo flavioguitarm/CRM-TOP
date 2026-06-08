@@ -393,10 +393,10 @@ const ClientsView: React.FC = () => {
     return found?.id || '';
   };
 
-  const handleBulkImport = (data: any[], strategy: 'ignore' | 'overwrite') => {
+  const handleBulkImport = async (data: any[], strategy: 'ignore' | 'overwrite') => {
     const today = new Date().toISOString().split('T')[0];
 
-    data.forEach(item => {
+    for (const item of data) {
       // ── Vinculação inteligente: resolve nomes → IDs ──────────────────────────
       const resolvedClassId  = resolveId(item.classId,       classes       as any[]);
       const resolvedInstId   = resolveId(item.institutionId,  institutions  as any[]);
@@ -447,8 +447,9 @@ const ClientsView: React.FC = () => {
             funnelId: item.funnelId || 'f-vendas',
             stageId: item.stageId || 's1'
           } as Client;
-          
-          addClient(newClient);
+
+          // Aguarda persistência antes de passar ao próximo — evita rate-limit e garante ordem
+          await addClient(newClient);
 
           if (item.soldProductId && item.soldValue) {
              const negId = crypto.randomUUID();
@@ -484,7 +485,7 @@ const ClientsView: React.FC = () => {
              }
           }
       }
-    });
+    }
   };
 
   const handleExportProcess = (classIds: string[]) => {

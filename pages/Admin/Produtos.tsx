@@ -169,13 +169,14 @@ const ProdutosAdmin: React.FC = () => {
     setCatModalOpen(false);
   };
 
-  const handleBulkImport = (data: any[]) => {
-    data.forEach(item => {
-      addProduct({
+  const handleBulkImport = async (data: any[]) => {
+    for (const item of data) {
+      // Aguarda persistência — evita sobrecarga paralela no Supabase
+      await addProduct({
         name: item.name,
         categoryId: item.categoryId || productCategories[0]?.id || '',
       });
-    });
+    }
   };
 
   return (

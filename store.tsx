@@ -54,7 +54,7 @@ interface DataContextType {
   purgeExpiredTrash: () => void;
   updateClientStage: (clientId: string, newStageId: string) => void;
   addClientActivity: (clientId: string, activity: any) => void;
-  addClient: (client: Client) => void;
+  addClient: (client: Client) => Promise<void>;
   updateClient: (client: Client) => void;
   // ── Supabase-backed CRUD ────────────────────────────────
   addInstitution: (data: Omit<Institution, 'id' | 'createdAt'>) => Promise<void>;
@@ -1214,7 +1214,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Helper: normaliza telefone para comparação (apenas dígitos) ──────────────
   const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
 
-  const addClient = (client: Client) => {
+  const addClient = async (client: Client) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const newClient = { ...client, createdAt: client.createdAt || todayStr };
     const clientPhoneNorm = normalizePhone(client.phone);
@@ -1265,13 +1265,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setClients(prev => [newClient, ...prev]);
 
-    // Persiste no Supabase (fire-and-forget)
+    // Persiste no Supabase (aguarda conclusão — essencial para importação em massa)
     if (tenantId) {
-      supabase.from('clients').insert(clientPayload(newClient, tenantId))
-        .then(({ error }) => { if (error) console.error('addClient:', error.message); });
+      const { error: clientErr } = await supabase
+        .from('clients')
+        .insert(clientPayload(newClient, tenantId));
+      if (clientErr) {
+        console.error('addClient:', clientErr.message);
+        // Rollback — insert rejeitado (ex: UUID duplicado, RLS, rate-limit)
+        setClients(prev => prev.filter(c => c.id !== newClient.id));
+        return;
+      }
 
       if (newClient.activities?.length) {
-        supabase.from('client_activities').insert(
+        const { error: actErr } = await supabase.from('client_activities').insert(
           newClient.activities.map(a => ({
             id:          a.id,
             tenant_id:   tenantId,
@@ -1281,7 +1288,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             timestamp:   new Date().toISOString(),
             attachments: a.attachments ?? [],
           }))
-        ).then(({ error }) => { if (error) console.error('addClient activities:', error.message); });
+        );
+        if (actErr) console.error('addClient activities:', actErr.message);
       }
     }
   };

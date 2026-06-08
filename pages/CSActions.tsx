@@ -554,9 +554,9 @@ const CSActionsView: React.FC = () => {
     }
   };
 
-  const handleBulkImport = (data: any[]) => {
-    data.forEach(item => {
-      addCSAction({
+  const handleBulkImport = async (data: any[]) => {
+    for (const item of data) {
+      await addCSAction({
         ...item,
         id: crypto.randomUUID(),
         activities: [],
@@ -566,7 +566,7 @@ const CSActionsView: React.FC = () => {
         volumeSold: parseInt(item.volumeSold) || 0,
         revenueResult: parseFloat(item.revenueResult) || 0
       } as CSAction);
-    });
+    }
   };
 
   const handleExportXLS = () => {

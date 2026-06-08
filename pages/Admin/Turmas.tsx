@@ -475,10 +475,11 @@ const TurmasAdmin: React.FC = () => {
     XLSX.writeFile(workbook, `turmas_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const handleBulkImport = (data: any[]) => {
+  const handleBulkImport = async (data: any[]) => {
     const today = new Date().toISOString().split('T')[0];
-    data.forEach(item => {
-      addClass({
+    for (const item of data) {
+      // Aguarda persistência — evita sobrecarga paralela no Supabase
+      await addClass({
         ...item,
         id: crypto.randomUUID(),
         graduationYear: parseInt(item.graduationYear) || new Date().getFullYear(),
@@ -488,7 +489,7 @@ const TurmasAdmin: React.FC = () => {
         classProducts: [],
         createdAt: today
       } as ClassRoom);
-    });
+    }
   };
 
   const importFields = [

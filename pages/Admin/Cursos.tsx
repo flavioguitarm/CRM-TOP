@@ -118,8 +118,10 @@ const CursosAdmin: React.FC = () => {
     XLSX.writeFile(workbook, `cursos_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const handleBulkImport = (data: any[]) => {
-    data.forEach(item => addCourse({ name: item.name }));
+  const handleBulkImport = async (data: any[]) => {
+    for (const item of data) {
+      await addCourse({ name: item.name });
+    }
   };
 
   const importFields = [

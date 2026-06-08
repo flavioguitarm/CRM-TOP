@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-08 (Sessão 15 — concluída)
+> Atualizado em: 2026-06-08 (Sessão 16 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1267,21 +1267,10 @@ gcloud run deploy crm-top-formaturas `
 
 ---
 
-## 🗺️ Próximos passos (Sessão 16+)
+## 🗺️ Próximos passos (Sessão 17+)
 
-### 1. Script `deploy.ps1` (alta prioridade)
-Criar script PowerShell na raiz do projeto que automatize o processo de build + push + deploy com um único comando:
-```powershell
-.\deploy.ps1 [-Tag "v1.2"] [-SkipBuild]
-```
-- Lê `.env.local` automaticamente para extrair as variáveis
-- Faz tag com timestamp ou versão
-- Exibe URL final após deploy
-
-### 2. Bug: Importação em massa não persiste após reload
-- `BulkImportModal` → dados importados aparecem na UI mas somem ao recarregar
-- Investigar se `addCSDailyService` em loop está sofrendo rate-limit ou se há problema de IDs duplicados
-- Garantir que todos os módulos de importação usam `crypto.randomUUID()` e aguardam o insert do Supabase antes de continuar
+### 1. ~~Script `deploy.ps1`~~ ✅ Concluído na Sessão 16
+### 2. ~~Bug: Importação em massa não persiste após reload~~ ✅ Corrigido na Sessão 16
 
 ### 3. Funis no Painel do Cliente (`ClientProfileView`)
 - Exibir o funil atual do cliente com o estágio destacado
@@ -1384,4 +1373,8 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 
 27. **Dashboard (Sessão 14):** 3 cards novos em grid de 3 colunas entre os StatCards e os gráficos: "Meta Total dos Projetos" (soma de `goalValue/goalQuantity` de todos os `classProducts`), "Custos × Faturamento" (ROI geral de `cs_actions` vs `sales`), "Campanhas" (total de `csActions` com breakdown ativas/encerradas). Independentes dos filtros de data/funil do dashboard.
 
-28. **Deploy Google Cloud Run (Sessão 15):** produção em `https://crm-top-formaturas-202492779530.us-west1.run.app`. Imagem Docker em dois estágios (node:20-alpine + nginx:alpine), porta 8080, variáveis Supabase injetadas em build-time via `--build-arg`. Artifact Registry: `us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top`. Script `deploy.ps1` ainda pendente de criação.
+28. **Deploy Google Cloud Run (Sessão 15):** produção em `https://crm-top-formaturas-202492779530.us-west1.run.app`. Imagem Docker em dois estágios (node:20-alpine + nginx:alpine), porta 8080, variáveis Supabase injetadas em build-time via `--build-arg`. Artifact Registry: `us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top`.
+
+29. **`deploy.ps1` (Sessão 16):** script PowerShell na raiz do projeto. Lê `.env.local`, verifica pré-requisitos (`docker`, `gcloud`), executa 5 etapas sequenciais: configure-docker → build → push → deploy → describe URL. Para com erro vermelho se qualquer etapa falhar. Uso: `.\deploy.ps1`.
+
+30. **Bug importação em massa corrigido (Sessão 16):** causa raiz era `data.forEach` sem `await` — todos os inserts disparados em paralelo sobrecarregavam o Supabase (rate-limit/conexões). Correção aplicada em **8 arquivos**: `addClient` em `store.tsx` tornou-se `async` com `await` no insert + rollback; todos os `handleBulkImport` em `Clients.tsx`, `CSDailyServices.tsx`, `Turmas.tsx`, `Produtos.tsx`, `CSActions.tsx`, `Cursos.tsx`, `Eventos.tsx`, `Instituicoes.tsx` convertidos para `async` + `for...of` + `await`. Tipo `onImport` em `BulkImportModal` atualizado para `void | Promise<void>`.

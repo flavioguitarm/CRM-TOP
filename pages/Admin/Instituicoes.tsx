@@ -180,10 +180,10 @@ const InstituicoesAdmin: React.FC = () => {
     XLSX.writeFile(workbook, `instituicoes_detalhado_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const handleBulkImport = (data: any[]) => {
-    data.forEach(item => {
-      addInstitution({ name: item.name, state: item.state ?? '', campi: [] });
-    });
+  const handleBulkImport = async (data: any[]) => {
+    for (const item of data) {
+      await addInstitution({ name: item.name, state: item.state ?? '', campi: [] });
+    }
   };
 
   return (

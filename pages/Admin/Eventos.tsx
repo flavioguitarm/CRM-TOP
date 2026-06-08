@@ -266,15 +266,15 @@ const EventosAdmin: React.FC = () => {
     XLSX.writeFile(workbook, `eventos_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const handleBulkImport = (data: any[]) => {
-    data.forEach(item => {
-      addEvent({
+  const handleBulkImport = async (data: any[]) => {
+    for (const item of data) {
+      await addEvent({
         ...item,
         id: crypto.randomUUID(),
         status: item.status || 'Previsão',
         activities: []
       } as Event);
-    });
+    }
   };
 
   const handleAddActivity = (e: React.FormEvent) => {

@@ -493,10 +493,10 @@ const CSDailyServicesView: React.FC = () => {
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [selectedService, setSelectedService] = useState<CSDailyService | null>(null);
 
-  const handleBulkImport = (data: any[]) => {
+  const handleBulkImport = async (data: any[]) => {
     const today = new Date().toISOString().split('T')[0];
-    data.forEach(item => {
-      if (!item.clientPhone) return;
+    for (const item of data) {
+      if (!item.clientPhone) continue;
       const service: CSDailyService = {
         id:                crypto.randomUUID(),
         date:              item.date || today,
@@ -509,8 +509,9 @@ const CSDailyServicesView: React.FC = () => {
         responsibleUserId: item.responsibleUserId || currentUser?.id || '',
         createdAt:         today,
       };
-      addCSDailyService(service);
-    });
+      // Aguarda persistência — evita sobrecarga paralela no Supabase
+      await addCSDailyService(service);
+    }
   };
 
   const importFields = [

@@ -19,7 +19,7 @@ interface MappingField {
 interface BulkImportModalProps {
   title: string;
   fields: MappingField[];
-  onImport: (data: any[], strategy: 'ignore' | 'overwrite') => void;
+  onImport: (data: any[], strategy: 'ignore' | 'overwrite') => void | Promise<void>;
   onClose: () => void;
 }
 
