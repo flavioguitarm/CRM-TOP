@@ -242,7 +242,7 @@ const NewLeadModal: React.FC<{
                   <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] border-b border-amber-100 pb-2">2. Vínculo Acadêmico</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase">Turma (Filtro Mestre)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase">Projeto (Filtro Mestre)</label>
                       <select className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-amber-500" value={formData.classId || ''} onChange={e => handleClassChange(e.target.value)}>
                         <option value="">Selecionar Turma...</option>
                         {classes.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
@@ -294,7 +294,7 @@ const NewLeadModal: React.FC<{
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase">Turma</label>
+                    <label className="text-[8px] font-black text-slate-400 uppercase">Projeto</label>
                     <select className="w-full bg-white border-none rounded-xl text-[10px] font-bold py-2 shadow-sm" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
                        <option value="">Todas</option>
                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

@@ -178,7 +178,7 @@ const ServiceModal: React.FC<{
 
             {/* Turma */}
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">5. Turma</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">5. Projeto</label>
               {matchedClient && clientClass ? (
                 <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between animate-in slide-in-from-top-2">
                   <div>
@@ -506,7 +506,7 @@ const CSDailyServicesView: React.FC = () => {
     <div className="h-full flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Atendimentos Diários CS</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Atendimentos Diários</h1>
           <p className="text-slate-500 font-medium mt-2 uppercase text-[10px] tracking-widest">Registro detalhado com automação de histórico.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -686,7 +686,7 @@ const CSDailyServicesView: React.FC = () => {
 
       {isImportModalOpen && (
         <BulkImportModal
-          title="Atendimentos Diários CS"
+          title="Atendimentos Diários"
           fields={importFields}
           onClose={() => setIsImportModalOpen(false)}
           onImport={handleBulkImport}

@@ -283,8 +283,8 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Dados Acadêmicos</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <SearchableSelect
-                label="Turma / Sala"
-                labelExtra={<HelpTooltip text="Ao selecionar a turma, a Instituição e o Curso são preenchidos automaticamente. A lista é filtrada pela Instituição selecionada acima." />}
+                label="Projeto"
+                labelExtra={<HelpTooltip text="Ao selecionar o projeto, a Instituição e o Curso são preenchidos automaticamente. A lista é filtrada pela Instituição selecionada acima." />}
                 options={classOptions}
                 value={formData.classId || ''}
                 onChange={handleClassChange}
@@ -548,7 +548,7 @@ const ClientsView: React.FC = () => {
     { key: 'tags', label: 'Etiquetas (sep. vírgula)' },
     { key: 'institutionId', label: 'Instituição (nome ou ID)' },
     { key: 'courseId', label: 'Curso (nome ou ID)' },
-    { key: 'classId', label: 'Turma / Sala (nome ou ID) — preenche inst. e curso automaticamente' },
+    { key: 'classId', label: 'Projeto (nome ou ID) — preenche inst. e curso automaticamente' },
     { key: 'shift', label: 'Turno' }, 
     { key: 'soldProductId', label: 'ID do Produto Vendido' },
     { key: 'soldValue', label: 'Valor da Venda (Ex: 4500.50)' },

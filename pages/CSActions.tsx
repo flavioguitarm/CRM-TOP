@@ -95,7 +95,7 @@ const CSActionModal: React.FC<{
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Turma Vinculada *</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Projeto Vinculado *</label>
             <select
                 required
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
@@ -108,9 +108,9 @@ const CSActionModal: React.FC<{
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Ano e Semestre da Turma</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Ano e Semestre do Projeto</label>
             <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-black text-slate-500 shadow-inner">
-               {selectedClass ? `${selectedClass.graduationYear}.${selectedClass.graduationMonth <= 6 ? '1' : '2'}` : 'Selecione uma turma...'}
+               {selectedClass ? `${selectedClass.graduationYear}.${selectedClass.graduationMonth <= 6 ? '1' : '2'}` : 'Selecione um projeto...'}
             </div>
           </div>
 
@@ -265,7 +265,7 @@ const DemandTypesConfig: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Tipos de Demanda</h2>
-          <p className="text-slate-400 text-xs mt-1">Tipos compartilhados entre Painel de Ações CS e Atendimentos Diários.</p>
+          <p className="text-slate-400 text-xs mt-1">Tipos compartilhados entre Painel de Ações e Atendimentos Diários.</p>
         </div>
         <button
           onClick={() => setIsAdding(true)}
@@ -379,7 +379,7 @@ const DemandTypesConfig: React.FC = () => {
   );
 };
 
-// ── View principal: Painel de Ações CS ────────────────────────────────────────
+// ── View principal: Painel de Ações ───────────────────────────────────────────
 const CSActionsView: React.FC = () => {
   const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users, demandTypes } = useData();
   const perms = usePermissions('acoesCs');
@@ -458,7 +458,7 @@ const CSActionsView: React.FC = () => {
         const cls = classes.find(c => c.id === a.classId);
         const user = users.find(u => u.id === a.responsibleUserId);
         return {
-            "Turma Vinculada": cls?.name || 'N/A',
+            "Projeto Vinculado": cls?.name || 'N/A',
             "Tipo de Demanda": a.type,
             "Data Inicial": a.startDate,
             "Data Final": a.endDate,
@@ -478,8 +478,8 @@ const CSActionsView: React.FC = () => {
   };
 
   const importFields = [
-    { key: 'classId', label: '1. Turma Vinculada', required: true },
-    { key: 'dummyInfo', label: '2. Ano e Semestre (Derivado da Turma)' },
+    { key: 'classId', label: '1. Projeto Vinculado', required: true },
+    { key: 'dummyInfo', label: '2. Ano e Semestre (Derivado do Projeto)' },
     { key: 'type', label: '3. Tipo de Demanda', required: true },
     { key: 'startDate', label: '4. Data Inicial', required: true },
     { key: 'endDate', label: '5. Data Final', required: true },
@@ -503,7 +503,7 @@ const CSActionsView: React.FC = () => {
       {/* Header com tabs */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Painel de Ações CS</h1>
+          <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Painel de Ações</h1>
           <p className="text-slate-500 font-medium">Monitoramento de engajamento e ROI das comunicações.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -513,7 +513,7 @@ const CSActionsView: React.FC = () => {
               onClick={() => setActiveTab('painel')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'painel' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <LayoutGrid size={14} /> Painel de Ações CS
+              <LayoutGrid size={14} /> Painel de Ações
             </button>
             <button
               onClick={() => setActiveTab('tipos')}
@@ -528,7 +528,7 @@ const CSActionsView: React.FC = () => {
       {/* Tab: Configurar Tipos de Demanda */}
       {activeTab === 'tipos' && <DemandTypesConfig />}
 
-      {/* Tab: Painel de Ações CS */}
+      {/* Tab: Painel de Ações */}
       {activeTab === 'painel' && (
         <div className="flex gap-6 flex-1 overflow-hidden min-h-0">
           <div className={`flex-1 flex flex-col gap-4 transition-all overflow-hidden ${selectedActionId ? 'w-1/2' : 'w-full'}`}>

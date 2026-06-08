@@ -28,6 +28,18 @@ import TrashPage from './pages/Admin/Trash';
 import DatabaseAdmin from './pages/Admin/Database';
 import AgendaView from './pages/Agenda';
 import UserProfile from './pages/UserProfile';
+import { Bot } from 'lucide-react';
+
+// ─── Placeholder: Automação de Funis ─────────────────────────────────────────
+const AutomacaoFunisPlaceholder: React.FC = () => (
+  <div className="h-full flex flex-col items-center justify-center gap-4 text-slate-400 py-24">
+    <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center">
+      <Bot size={32} className="text-slate-300" />
+    </div>
+    <h2 className="text-xl font-black text-slate-700 uppercase tracking-tight">Automação de Funis</h2>
+    <p className="text-sm font-medium text-slate-400">Em desenvolvimento — em breve aqui.</p>
+  </div>
+);
 
 // ─── Sincroniza sessão Supabase → currentUser do store ───────────────────────
 
@@ -168,6 +180,9 @@ const AppRoutes: React.FC = () => (
     <Route path="/admin/produtos"        element={<RoleGuard module="produtos">     <ProdutosAdmin />     </RoleGuard>} />
     <Route path="/admin/eventos"         element={<RoleGuard module="eventos">      <EventosAdmin />      </RoleGuard>} />
     <Route path="/admin/tipos-atividade" element={<RoleGuard module="activityTypes"><ActivityTypesAdmin /></RoleGuard>} />
+    <Route path="/admin/automacao-funis" element={<RoleGuard module="funis"><AutomacaoFunisPlaceholder /></RoleGuard>} />
+
+    {/* Sistema — ADMIN apenas */}
     <Route path="/admin/lixeira"         element={<RoleGuard module="lixeira">      <TrashPage />         </RoleGuard>} />
 
     {/* Restritos — ADMIN apenas */}

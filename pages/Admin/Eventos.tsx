@@ -154,8 +154,8 @@ const EventModal: React.FC<{
           </div>
 
           <SearchableSelect 
-            label="Turma Vinculada (Cronograma)" 
-            placeholder="Selecionar Turma da Base..." 
+            label="Projeto Vinculado (Cronograma)"
+            placeholder="Selecionar Projeto da Base..." 
             options={classOptions} 
             value={formData.classId || ''} 
             onChange={v => setFormData({...formData, classId: v})} 
@@ -256,7 +256,7 @@ const EventosAdmin: React.FC = () => {
             "Tipo": e.type,
             "Data": new Date(e.startDateTime).toLocaleString('pt-BR'),
             "Status": e.status,
-            "Turma Vinculada": cls?.name || 'Geral'
+            "Projeto Vinculado": cls?.name || 'Geral'
         };
     });
     
@@ -472,7 +472,7 @@ const EventosAdmin: React.FC = () => {
                      <span className="text-sm font-black text-slate-900 uppercase">{selectedEvt.type}</span>
                    </div>
                    <div>
-                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Turma Vinculada</p>
+                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Projeto Vinculado</p>
                      {linkedClass ? (
                        <div className="flex flex-col gap-1">
                           <span className="text-sm font-black text-slate-900 uppercase">{linkedClass.name}</span>

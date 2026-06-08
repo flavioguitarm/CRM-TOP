@@ -465,7 +465,7 @@ const TurmasAdmin: React.FC = () => {
       <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedClassId ? 'w-1/2' : 'w-full'}`}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Gestão de Turmas</h1>
+            <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">Gestão de Projetos</h1>
             <p className="text-slate-500 font-medium">Controle técnico e cronograma das comissões de formatura.</p>
           </div>
           <div className="flex items-center gap-3">
