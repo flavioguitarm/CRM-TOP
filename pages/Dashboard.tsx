@@ -4,15 +4,16 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, 
   LineChart, Line, Legend, Cell, PieChart, Pie
 } from 'recharts';
-import { 
-  TrendingUp, Users, DollarSign, CheckCircle2, Calendar, Filter, Layers, 
+import {
+  TrendingUp, Users, DollarSign, CheckCircle2, Calendar, Filter, Layers,
   XCircle, Clock, ArrowUpRight, Target, ShieldCheck, Database, AlertTriangle,
-  FileText, Activity, BarChart3, ChevronRight, Zap, Briefcase
+  FileText, Activity, BarChart3, ChevronRight, Zap, Briefcase, Megaphone,
+  TrendingDown, BarChart2
 } from 'lucide-react';
 import { useData } from '../store';
 
 const Dashboard: React.FC = () => {
-  const { sales, clients, users, funnels, classes } = useData();
+  const { sales, clients, users, funnels, classes, csActions } = useData();
   
   // Filtros Solicitados
   const [filterFunnelId, setFilterFunnelId] = useState('');
@@ -106,6 +107,35 @@ const Dashboard: React.FC = () => {
     return Object.entries(monthlyMap).sort().map(([month, value]) => ({ month: month.split('-')[1] + '/' + month.split('-')[0].substring(2), value }));
   }, [dashboardData.filteredSales]);
 
+  // Card 1 — Meta Total dos Projetos
+  const metaData = useMemo(() => {
+    let metaQty = 0;
+    let metaValue = 0;
+    classes.forEach(cls => {
+      cls.classProducts.forEach(cp => {
+        metaQty   += cp.goalQuantity ?? 0;
+        metaValue += cp.goalValue    ?? 0;
+      });
+    });
+    return { metaQty, metaValue };
+  }, [classes]);
+
+  // Card 2 — Custos × Faturamento
+  const costsData = useMemo(() => {
+    const totalCost    = csActions.reduce((acc, a) => acc + (a.cost ?? 0), 0);
+    const totalRevenue = sales.reduce((acc, s) => acc + s.value, 0);
+    const roi          = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : null;
+    return { totalCost, totalRevenue, roi };
+  }, [csActions, sales]);
+
+  // Card 3 — Campanhas
+  const campaignsData = useMemo(() => {
+    const total    = csActions.length;
+    const active   = csActions.filter(a => a.status !== 'FEITO' && a.status !== 'ENCERRADO').length;
+    const closed   = total - active;
+    return { total, active, closed };
+  }, [csActions]);
+
   const StatCard = ({ title, value, icon: Icon, colorClass, bgColorClass, suffix = "", prefix = "" }: any) => (
     <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:translate-y-[-4px] transition-all group relative overflow-hidden">
       <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform ${colorClass}`}>
@@ -176,6 +206,96 @@ const Dashboard: React.FC = () => {
         <StatCard title="Ganhos (Won)" value={dashboardData.negGanhas} icon={CheckCircle2} colorClass="text-emerald-600" bgColorClass="bg-emerald-50" />
         <StatCard title="Perdas (Lost)" value={dashboardData.negPerdidas} icon={XCircle} colorClass="text-rose-500" bgColorClass="bg-rose-50" />
         <StatCard title="Conversão" value={parseFloat(dashboardData.conversion)} suffix="%" icon={TrendingUp} colorClass="text-amber-500" bgColorClass="bg-amber-50" />
+      </div>
+
+      {/* ── Novos cards: Metas · Custos × Faturamento · Campanhas ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* Card 1 — Meta Total dos Projetos */}
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-5 hover:shadow-xl hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-amber-50 text-amber-500"><Target size={24} /></div>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Meta Total dos Projetos</h3>
+          </div>
+          <p className="text-3xl font-black text-slate-900 tracking-tight">
+            R$ {metaData.metaValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+          </p>
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Meta de Volume</p>
+              <p className="text-lg font-black text-slate-700">{metaData.metaQty.toLocaleString()} un.</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">VGV Alvo</p>
+              <p className="text-lg font-black text-amber-600">R$ {(metaData.metaValue / 1000).toFixed(0)}k</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2 — Custos × Faturamento */}
+        <div className="bg-slate-900 rounded-[2.5rem] shadow-xl p-8 space-y-5 hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-slate-800 text-emerald-400"><BarChart2 size={24} /></div>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Custos × Faturamento</h3>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Faturamento Total</p>
+                <p className="text-2xl font-black text-emerald-400">R$ {costsData.totalRevenue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Custo Total</p>
+                <p className="text-xl font-black text-rose-400">R$ {costsData.totalCost.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+            {/* Barra proporcional */}
+            {costsData.totalRevenue > 0 && (
+              <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mt-3">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min((costsData.totalRevenue / Math.max(costsData.totalRevenue, costsData.totalCost)) * 100, 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+          <div className="pt-3 border-t border-slate-800">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">ROI Geral</p>
+            {costsData.roi !== null ? (
+              <p className={`text-2xl font-black ${costsData.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {costsData.roi >= 0 ? '+' : ''}{costsData.roi.toFixed(1)}%
+              </p>
+            ) : (
+              <p className="text-xl font-black text-slate-600">— Sem custos</p>
+            )}
+          </div>
+        </div>
+
+        {/* Card 3 — Campanhas */}
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-5 hover:shadow-xl hover:translate-y-[-4px] transition-all">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-violet-50 text-violet-500"><Megaphone size={24} /></div>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Campanhas (Ações CS)</h3>
+          </div>
+          <p className="text-3xl font-black text-slate-900 tracking-tight">{campaignsData.total}</p>
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ativas</p>
+                <p className="text-lg font-black text-amber-600">{campaignsData.active}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Encerradas</p>
+                <p className="text-lg font-black text-slate-500">{campaignsData.closed}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
