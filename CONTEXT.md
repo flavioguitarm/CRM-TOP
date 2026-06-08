@@ -819,28 +819,220 @@ Frontend (Admin) → supabase.functions.invoke('create-user') → Edge Function
 
 ---
 
-## 🗺️ Próximos passos (Sessão 12+)
+## ✅ Sessão 12 — UX Padronização, Turmas do Projeto, Painel de Ações e Sininho (2026-06-08)
 
-### 1. Deploy das Edge Functions
+### Painel de Detalhes — padrão oficial aplicado em todos os módulos
+
+O padrão aprovado no FunnelConfig/Agenda foi propagado para todos os painéis restantes:
+
+| Módulo | Mudança |
+|--------|---------|
+| `pages/Clients.tsx` | Toggle no click do row + `rounded-[2.5rem]` + `animate-in slide-in-from-right-4 duration-200` |
+| `pages/CSActions.tsx` | Painel lateral criado do zero — mesmo padrão |
+| `pages/Admin/Instituicoes.tsx` | Toggle + card arredondado padronizado |
+| `pages/Admin/Turmas.tsx` | Toggle + card arredondado padronizado |
+
+**Regras do padrão:**
+- Sem backdrop/blur
+- Container `flex gap-4`; lista encolhe quando painel abre
+- `w-[480–580px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm`
+- Toggle: clicar no mesmo item fecha o painel (`prev === id ? null : id`)
+- Animação: `animate-in slide-in-from-right-4 duration-200`
+
+---
+
+### Turmas dentro do Projeto (`project_classes`)
+
+**Nova tabela Supabase:**
+```sql
+CREATE TABLE IF NOT EXISTS public.project_classes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  tenant_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.project_classes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tenant_isolate_project_classes" ON public.project_classes
+  USING (tenant_id = current_org_id()) WITH CHECK (tenant_id = current_org_id());
+```
+
+**`types.ts`** — novo interface:
+```typescript
+export interface ProjectClass {
+  id: string;
+  projectId: string; // FK → ClassRoom.id
+  name: string;
+  createdAt: string;
+}
+```
+
+**`store.tsx`** — adições:
+- Estado `projectClasses: ProjectClass[]`
+- useEffect de fetch da tabela `project_classes`
+- CRUD: `addProjectClass`, `updateProjectClass`, `deleteProjectClass` (com optimistic update + rollback)
+- Exportados no DataContext
+
+**`pages/Admin/Turmas.tsx`** — seção "Turmas do Projeto" no painel de detalhes:
+- Campo de texto + botão "Adicionar" (Enter ativa)
+- Lista com inline edit (clique no lápis → input com Enter/Escape/Save)
+- Delete via `ConfirmModal`
+- Estados: `newPCName`, `editingPCId`, `editingPCName`
+
+---
+
+### Botão "Cadastrar Funil" no Projeto
+
+No painel de detalhes de Turmas, botão que:
+1. Verifica `funnels.find(f => f.name.toLowerCase() === selectedClass.name.toLowerCase())`
+2. Se já existe → banner âmbar "Funil já existe"
+3. Se não existe → cria funil com 5 etapas padrão via `addFunnel`
+4. Banner feedback auto-dismiss em 4s (emerald = criado, amber = já existe)
+
+**Etapas padrão ao criar qualquer funil:**
+```typescript
+const DEFAULT_STAGES = [
+  { name: 'Sem Contato',      color: '#94a3b8' },
+  { name: 'Contatado',        color: '#f59e0b' },
+  { name: 'Proposta Enviada', color: '#3b82f6' },
+  { name: 'Negociação',       color: '#8b5cf6' },
+  { name: 'Fechamento',       color: '#10b981' },
+];
+```
+Aplicado tanto no botão "Cadastrar Funil" quanto ao criar novo funil no `FunnelConfig`.
+
+---
+
+### Sub-menu "Tipo de Canal" no Painel de Ações
+
+**Nova tabela Supabase:**
+```sql
+CREATE TABLE IF NOT EXISTS public.channel_types (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  color text NOT NULL DEFAULT '#94a3b8',
+  tenant_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.channel_types ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tenant_isolate_channel_types" ON public.channel_types
+  USING (tenant_id = current_org_id()) WITH CHECK (tenant_id = current_org_id());
+```
+
+**`types.ts`** — novo interface:
+```typescript
+export interface ChannelType {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+```
+
+**`store.tsx`** — adições:
+- Estado `channelTypes: ChannelType[]`
+- CRUD: `addChannelType`, `updateChannelType`, `deleteChannelType`
+
+**`pages/CSActions.tsx`** — terceiro tab:
+- Tab type mudou para `'painel' | 'canais' | 'tipos'`
+- Tab "Tipo de Canal" com ícone `Palette`
+- Componente inline `ChannelTypesConfig` (mesmo padrão do `DemandTypesConfig`)
+
+---
+
+### Campo Custo + CAC no Painel de Ações
+
+**SQL:**
+```sql
+ALTER TABLE public.cs_actions ADD COLUMN IF NOT EXISTS cost numeric(12,2) DEFAULT 0;
+```
+
+**`types.ts`** — `CSAction` atualizado:
+```typescript
+cost?: number; // após channel
+```
+
+**`store.tsx`** — `mapCSActionRow` e CRUD atualizados para incluir `cost`.
+
+**`CSActionModal`** — Campo "13. Custo (R$)" (rose-themed, `type="number"`, `step="0.01"`).
+
+**Painel de detalhes** — grid 2→4 cards:
+| Card | Cor | Valor |
+|------|-----|-------|
+| Custo Total | rose | `action.cost` |
+| Atingidos / Respostas | slate-900 | `totalReached` / `totalResponses` |
+| Faturamento + ROI | emerald | `revenueResult` + ROI líquido (`revenueResult - cost`) |
+| CAC | purple | `cost / totalReached` (null se sem dados) |
+
+---
+
+### Sininho — próximas 10 atividades
+
+**`components/Header.tsx`** — `upcomingActivities` useMemo expandido:
+- Adicionado filtro de `csActions`: `a.endDate >= todayStr && a.status !== 'FEITO'`
+- Campo `link` por tipo: `'/clientes'` (task), `'/admin/eventos'` (event), `'/acoes-cs'` (action)
+- Limite: 5 → **10**
+- Render: cada item é um `<Link to={act.link}>` com ícone por tipo (ListTodo/Zap/Calendar) e badge colorido (Tarefa/Ação CS/Evento)
+- Badge header: "pendentes" → "próximas"
+
+---
+
+### Canal Contatado fixo — `CSDailyServices.tsx`
+
+Substituído array de 7 opções por lista fixa de 3:
+```typescript
+const CANAL_CONTATADO_OPTIONS = ['API', 'CS1', 'CS2'];
+```
+*(futuramente virá de cadastro — base para o módulo de Canal)*
+
+---
+
+### FunnelConfig — painel de detalhes reescrito
+
+Substituído layout baseado em `GenericRegistry` por:
+- Lista clicável de funis (esquerda)
+- Painel de detalhes (direita) com:
+  - Etapas com barras de progresso + contagem de clientes por etapa
+  - Botão de export XLS por etapa (aparece no hover)
+  - Botão "Exportar Funil Completo" (XLSX com todas as etapas em abas)
+  - Botões Edit / Delete
+
+**Imports adicionados:** `useMemo`, `Download`, `FileSpreadsheet`, `Edit3`, `GitBranch`, `* as XLSX`
+
+---
+
+### Fixes da sessão
+
+- **`FunnelConfig.tsx`** — variável `funnelColumns` e tipo `Column` removidos (dead code que causava erro TS após reescrita do JSX)
+- **`Agenda.tsx`** — painel de detalhes usava campos inexistentes (`e.location`, `e.responsible`, `a.objective`, `a.result`); corrigido para campos reais dos tipos
+- **`store.tsx`** — `channelTypes` estava duplicado no objeto do Provider (linha 2349 + 2361); removido da linha 2349
+
+---
+
+## 🗺️ Próximos passos (Sessão 13+)
+
+### 1. Timeline de Atividades
+- Adicionar seção "Histórico / Timeline" em todos os painéis de detalhes
+- Clientes, Projetos (Turmas), Painel de Ações, Instituições
+- Formato: lista cronológica com tipo de atividade + autor + timestamp
+
+### 2. Dashboard melhorado
+- Custos × Faturamento por período (gráfico de barras)
+- Campanhas em destaque (top ações CS por ROI)
+- Indicadores de conversão por funil
+
+### 3. Verificação cruzada Atendimentos × Clientes
+- Na tela de Atendimentos Diários, vincular automaticamente ao cliente pelo telefone
+- Alerta se telefone não encontrado em nenhum cliente cadastrado
+
+### 4. Deploy online
+- Build de produção + hospedagem (Vercel / Netlify / servidor próprio)
+- Configurar variáveis de ambiente de produção
+- Testar RLS em ambiente limpo
+
+### 5. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
-- Verificar variáveis de ambiente no painel Supabase (SUPABASE_SERVICE_ROLE_KEY é automática)
-
-### 2. Automações do funil
-- Notificações automáticas ao mover card entre etapas
-- Regras de SLA por etapa (ex.: alertar se lead ficou X dias parado)
-- Relatório de conversão por etapa / por consultor
-
-### 3. Melhorias do Dashboard
-- Gráfico de evolução de vendas por período
-- Top consultores por volume e valor
-- Taxa de conversão por turma / instituição
-- Indicadores de CS (atendimentos por tipo de demanda)
-
-### 4. Integração WhatsApp + Agente ARES
-- Definir arquitetura de integração (webhook WhatsApp → Supabase → CRM)
-- Agente ARES: acesso aos dados do CRM via Edge Functions
-- Fluxo de atendimento automatizado conectado ao `cs_daily_services`
 
 ---
 
@@ -890,3 +1082,15 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
     - Deploy: `supabase functions deploy <nome>`
 
 16. **IDs — regra absoluta:** sempre `crypto.randomUUID()` para qualquer entidade que vá ao Supabase. `Date.now()` e `Math.random()` só são aceitáveis para IDs de localStorage (ex.: `trash-${Date.now()}`).
+
+17. **Painel de Detalhes — padrão oficial (Sessão 12):** sem backdrop, card `rounded-[2.5rem]` flutuante, toggle no click (clicar no mesmo item fecha), `animate-in slide-in-from-right-4 duration-200`. Aplicado em: FunnelConfig, Agenda, Clients, CSActions, Instituicoes, Turmas.
+
+18. **`project_classes` (Sessão 12):** tabela nova `public.project_classes` com `project_id` FK para `classes`. CRUD no store (`addProjectClass`, `updateProjectClass`, `deleteProjectClass`) com optimistic update + rollback. Interface `ProjectClass` em `types.ts`.
+
+19. **`channel_types` (Sessão 12):** tabela nova `public.channel_types`. CRUD no store. Interface `ChannelType` em `types.ts`. Exibida no terceiro tab do Painel de Ações.
+
+20. **`cs_actions.cost` (Sessão 12):** coluna `numeric(12,2) DEFAULT 0` adicionada via `ALTER TABLE`. Campo `cost?: number` no interface `CSAction`. CAC calculado no painel: `cost / totalReached`.
+
+21. **`CANAL_CONTATADO_OPTIONS` (Sessão 12):** fixo em `['API', 'CS1', 'CS2']` em `CSDailyServices.tsx`. Futuramente virá de cadastro (base `channel_types`).
+
+22. **Etapas padrão de funil (Sessão 12):** ao criar qualquer funil (FunnelConfig ou botão "Cadastrar Funil" em Turmas), 5 etapas são auto-inseridas: Sem Contato (#94a3b8), Contatado (#f59e0b), Proposta Enviada (#3b82f6), Negociação (#8b5cf6), Fechamento (#10b981).
