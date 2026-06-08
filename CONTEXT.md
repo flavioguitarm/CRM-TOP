@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-08 (Sessão 14 — concluída)
+> Atualizado em: 2026-06-08 (Sessão 15 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1186,28 +1186,127 @@ Ao editar qualquer campo de um cliente, propaga silenciosamente para todos os at
 
 ---
 
-## 🗺️ Próximos passos (Sessão 15+)
+## ✅ Sessão 15 — Deploy Google Cloud Run (2026-06-08)
 
-### 1. Testes gerais e correções de bugs
-- Testar fluxo completo: criar cliente → atendimentos retroativos vinculados
-- Testar atualização de cliente → atendimentos atualizados
-- Testar banner de divergência ao editar atendimento com dados desatualizados
-- Verificar `ActivityTimeline` em Clientes e Turmas com dados reais
+### 🚀 Deploy Online — Google Cloud Run
 
-### 2. Importação em massa com persistência completa
-- `BulkImportModal` — revisar se atendimentos importados via planilha passam pela verificação cruzada
-- Garantir que IDs gerados na importação são `crypto.randomUUID()` em todos os módulos
+**URL de produção:**
+```
+https://crm-top-formaturas-202492779530.us-west1.run.app
+```
 
-### 3. Deploy online
-- Build de produção + hospedagem (Vercel / Netlify / servidor próprio)
-- Configurar variáveis de ambiente de produção
-- Testar RLS em ambiente limpo com múltiplos usuários
+**Infraestrutura provisionada:**
 
-### 4. Deploy das Edge Functions (pendente desde Sessão 11)
+| Recurso | Valor |
+|---------|-------|
+| Plataforma | Google Cloud Run (serverless containers) |
+| Região | `us-west1` |
+| Projeto GCP | `gen-lang-client-0491323320` |
+| Artifact Registry | `us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top` |
+| Imagem Docker | `us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top/crm-top-formaturas` |
+
+---
+
+### 🐳 Dockerfile
+
+```dockerfile
+# Build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+- Build em dois estágios (node:20-alpine → nginx:alpine)
+- `nginx.conf` customizado para suportar `HashRouter` (todas as rotas servem `index.html`)
+- Porta `8080` (exigida pelo Cloud Run)
+- Variáveis de ambiente (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) injetadas em **build-time** via `--build-arg` → `ARG` → `ENV` no Dockerfile
+
+### 📄 `.dockerignore`
+
+```
+node_modules
+dist
+.env*
+.git
+*.md
+```
+
+---
+
+### 🔄 Processo de deploy (manual — Sessão 15)
+
+```powershell
+# 1. Build da imagem
+docker build `
+  --build-arg VITE_SUPABASE_URL=<url> `
+  --build-arg VITE_SUPABASE_ANON_KEY=<key> `
+  -t us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top/crm-top-formaturas:latest .
+
+# 2. Push para Artifact Registry
+docker push us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top/crm-top-formaturas:latest
+
+# 3. Deploy no Cloud Run
+gcloud run deploy crm-top-formaturas `
+  --image us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top/crm-top-formaturas:latest `
+  --platform managed `
+  --region us-west1 `
+  --allow-unauthenticated
+```
+
+> **Pendente:** criar `deploy.ps1` na raiz do projeto com esses comandos parametrizados para agilizar deploys futuros.
+
+---
+
+## 🗺️ Próximos passos (Sessão 16+)
+
+### 1. Script `deploy.ps1` (alta prioridade)
+Criar script PowerShell na raiz do projeto que automatize o processo de build + push + deploy com um único comando:
+```powershell
+.\deploy.ps1 [-Tag "v1.2"] [-SkipBuild]
+```
+- Lê `.env.local` automaticamente para extrair as variáveis
+- Faz tag com timestamp ou versão
+- Exibe URL final após deploy
+
+### 2. Bug: Importação em massa não persiste após reload
+- `BulkImportModal` → dados importados aparecem na UI mas somem ao recarregar
+- Investigar se `addCSDailyService` em loop está sofrendo rate-limit ou se há problema de IDs duplicados
+- Garantir que todos os módulos de importação usam `crypto.randomUUID()` e aguardam o insert do Supabase antes de continuar
+
+### 3. Funis no Painel do Cliente (`ClientProfileView`)
+- Exibir o funil atual do cliente com o estágio destacado
+- Permitir mover o cliente entre etapas diretamente do painel lateral
+- Mostrar histórico de movimentações de etapa na timeline
+
+### 4. Melhorias do Dashboard — 3 seções planejadas
+
+**Seção A — Desempenho por Consultor**
+- Ranking de consultores por volume de vendas e taxa de conversão
+- Filtro por período e funil (reusa os filtros existentes)
+
+**Seção B — Funis em destaque**
+- Distribuição de clientes por etapa em cada funil
+- Gráfico de barras empilhadas por estágio
+
+**Seção C — Ações CS por ROI**
+- Top 5 campanhas com maior retorno sobre investimento
+- Tabela: campanha, custo, faturamento, ROI%
+
+### 5. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
 
-### 5. Integrações futuras
+### 6. Integrações futuras
 - **WhatsApp**: integração com API (envio de mensagens a partir de atendimentos)
 - **ARES**: integração com sistema ERP para sincronização de vendas e dados de formandos
 
@@ -1284,3 +1383,5 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
     - `ServiceModal` em `CSDailyServices.tsx`: banner âmbar de divergência ao editar atendimento existente cujos dados diferem do cliente vinculado; botões "Sincronizar com cliente" / "Manter atual"
 
 27. **Dashboard (Sessão 14):** 3 cards novos em grid de 3 colunas entre os StatCards e os gráficos: "Meta Total dos Projetos" (soma de `goalValue/goalQuantity` de todos os `classProducts`), "Custos × Faturamento" (ROI geral de `cs_actions` vs `sales`), "Campanhas" (total de `csActions` com breakdown ativas/encerradas). Independentes dos filtros de data/funil do dashboard.
+
+28. **Deploy Google Cloud Run (Sessão 15):** produção em `https://crm-top-formaturas-202492779530.us-west1.run.app`. Imagem Docker em dois estágios (node:20-alpine + nginx:alpine), porta 8080, variáveis Supabase injetadas em build-time via `--build-arg`. Artifact Registry: `us-west1-docker.pkg.dev/gen-lang-client-0491323320/crm-top`. Script `deploy.ps1` ainda pendente de criação.
