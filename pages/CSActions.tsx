@@ -578,7 +578,7 @@ const CSActionsView: React.FC = () => {
                       <tr
                         key={action.id}
                         className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedIds.has(action.id) ? 'bg-amber-50/50' : ''} ${selectedActionId === action.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''}`}
-                        onClick={() => setSelectedActionId(action.id)}
+                        onClick={() => setSelectedActionId(prev => prev === action.id ? null : action.id)}
                       >
                         <td className="px-8 py-5" onClick={(e) => { e.stopPropagation(); toggleSelect(action.id); }}>
                           <button
@@ -631,7 +631,7 @@ const CSActionsView: React.FC = () => {
           </div>
 
           {selectedActionId && selectedAction && (
-            <div className="w-[640px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl overflow-y-auto">
+            <div className="w-[580px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200 overflow-y-auto">
               <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
                   <Zap size={28} className="text-amber-500" /> Detalhes da Ação

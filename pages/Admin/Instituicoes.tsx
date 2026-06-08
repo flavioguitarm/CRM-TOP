@@ -206,7 +206,7 @@ const InstituicoesAdmin: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-auto">
           {sortedInstitutions.map(inst => (
-            <div key={inst.id} onClick={() => setSelectedInstId(inst.id)} className={`p-6 rounded-[2.5rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedInstId === inst.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedIds.has(inst.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}>
+            <div key={inst.id} onClick={() => setSelectedInstId(prev => prev === inst.id ? null : inst.id)} className={`p-6 rounded-[2.5rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedInstId === inst.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedIds.has(inst.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}>
               <button onClick={(e) => toggleSelect(inst.id, e)} className={`absolute top-4 left-4 p-1 rounded-lg transition-all ${selectedIds.has(inst.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
                 {selectedIds.has(inst.id) ? <CheckSquare size={18}/> : <Square size={18}/>}
               </button>
@@ -228,7 +228,7 @@ const InstituicoesAdmin: React.FC = () => {
       </div>
 
       {selectedInstId && selectedInst && (
-        <div className="w-[520px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl">
+        <div className="w-[480px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
           <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
               <Building2 size={28} className="text-amber-500" /> Perfil da Instituição

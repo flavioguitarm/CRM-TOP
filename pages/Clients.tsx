@@ -625,7 +625,7 @@ const ClientsView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredClients.map(client => (
-                  <tr key={client.id} className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClientId === client.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''} ${selectedIds.has(client.id) ? 'bg-amber-50' : ''}`} onClick={() => setSelectedClientId(client.id)}>
+                  <tr key={client.id} className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClientId === client.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : ''} ${selectedIds.has(client.id) ? 'bg-amber-50' : ''}`} onClick={() => setSelectedClientId(prev => prev === client.id ? null : client.id)}>
                     <td className="px-4 py-5" onClick={e => e.stopPropagation()}>
                       <button onClick={e => toggleSelect(client.id, e)} className="text-slate-400 hover:text-amber-600 transition-colors">
                         {selectedIds.has(client.id) ? <CheckSquare size={16} className="text-amber-500"/> : <Square size={16}/>}
@@ -649,7 +649,7 @@ const ClientsView: React.FC = () => {
       </div>
 
       {selectedClientId && (
-        <div className="w-[520px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl relative">
+        <div className="w-[520px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
           <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
             <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
               <User size={28} className="text-amber-500" /> Perfil do Cliente

@@ -502,7 +502,7 @@ const TurmasAdmin: React.FC = () => {
                   <tr
                     key={cls.id}
                     className={`hover:bg-amber-50 cursor-pointer transition-colors group ${selectedClassId === cls.id ? 'bg-amber-50 ring-2 ring-inset ring-amber-500' : selectedIds.has(cls.id) ? 'bg-rose-50' : ''}`}
-                    onClick={() => setSelectedClassId(cls.id)}
+                    onClick={() => setSelectedClassId(prev => prev === cls.id ? null : cls.id)}
                   >
                     <td className="px-4 py-5" onClick={e => e.stopPropagation()}>
                       <button onClick={(e) => toggleSelect(cls.id, e)} className="p-1 rounded hover:bg-slate-200 transition-colors">
@@ -546,7 +546,7 @@ const TurmasAdmin: React.FC = () => {
       </div>
 
       {selectedClassId && selectedClass && (
-        <div className="w-[640px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl overflow-y-auto">
+        <div className="w-[580px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200 overflow-y-auto">
           <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
             <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
               <GraduationCap size={28} className="text-amber-500" /> Perfil da Turma
