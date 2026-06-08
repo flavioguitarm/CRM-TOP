@@ -257,60 +257,40 @@ const Sidebar: React.FC = () => {
             </button>
             <div className={`space-y-1 overflow-hidden transition-all duration-300 ${isOperacaoExpanded ? 'max-h-[800px] opacity-100 mb-6' : 'max-h-0 opacity-0'}`}>
 
-              {/* Dashboard */}
-              <NavLink key="/" item={OPERACAO_ITEMS[0]} collapsed={false} pathname={pathname} />
+              {/* Um único loop — injeta sub-menu de Negociações após o Dashboard (índice 0) */}
+              {operacaoVisible.map((item, idx) => (
+                <React.Fragment key={item.path}>
+                  <NavLink item={item} collapsed={false} pathname={pathname} onGatedClick={openPwdGate} />
 
-              {/* Negociações (expandível) */}
-              {showNegociacoes && (
-                <div>
-                  <button
-                    onClick={() => setIsNegExpanded(!isNegExpanded)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
-                      negActive && !isNegExpanded ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'hover:bg-slate-800'
-                    }`}
-                  >
-                    <Funnel size={22} className={negActive && !isNegExpanded ? 'text-white' : 'text-slate-400'} />
-                    <span className="font-semibold text-sm flex-1 text-left">Negociações</span>
-                    {isNegExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
-                  </button>
+                  {idx === 0 && showNegociacoes && (
+                    <div>
+                      <button
+                        onClick={() => setIsNegExpanded(!isNegExpanded)}
+                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                          negActive && !isNegExpanded ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'hover:bg-slate-800'
+                        }`}
+                      >
+                        <Funnel size={22} className={negActive && !isNegExpanded ? 'text-white' : 'text-slate-400'} />
+                        <span className="font-semibold text-sm flex-1 text-left">Negociações</span>
+                        {isNegExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
+                      </button>
 
-                  <div className={`overflow-hidden transition-all duration-200 ${isNegExpanded ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-700 pl-3">
-                      <Link
-                        to="/funil"
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          pathname === '/funil' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                        }`}
-                      >
-                        <Funnel size={15} className={pathname === '/funil' ? 'text-amber-400' : 'text-slate-500'} />
-                        Negociações
-                      </Link>
-                      <Link
-                        to="/admin/funis"
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          pathname === '/admin/funis' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                        }`}
-                      >
-                        <GitBranch size={15} className={pathname === '/admin/funis' ? 'text-amber-400' : 'text-slate-500'} />
-                        Funis
-                      </Link>
-                      <Link
-                        to="/admin/automacao-funis"
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          pathname === '/admin/automacao-funis' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                        }`}
-                      >
-                        <Bot size={15} className={pathname === '/admin/automacao-funis' ? 'text-amber-400' : 'text-slate-500'} />
-                        Automação de Funis
-                      </Link>
+                      <div className={`overflow-hidden transition-all duration-200 ${isNegExpanded ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-700 pl-3">
+                          <Link to="/funil" className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${pathname === '/funil' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+                            <Funnel size={15} className={pathname === '/funil' ? 'text-amber-400' : 'text-slate-500'} /> Negociações
+                          </Link>
+                          <Link to="/admin/funis" className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${pathname === '/admin/funis' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+                            <GitBranch size={15} className={pathname === '/admin/funis' ? 'text-amber-400' : 'text-slate-500'} /> Funis
+                          </Link>
+                          <Link to="/admin/automacao-funis" className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${pathname === '/admin/automacao-funis' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+                            <Bot size={15} className={pathname === '/admin/automacao-funis' ? 'text-amber-400' : 'text-slate-500'} /> Automação de Funis
+                          </Link>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Demais itens de Operação (já sem /funil) */}
-              {operacaoVisible.map(item => (
-                <NavLink key={item.path} item={item} collapsed={false} pathname={pathname} onGatedClick={openPwdGate} />
+                  )}
+                </React.Fragment>
               ))}
             </div>
           </>

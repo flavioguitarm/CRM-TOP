@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { useData } from '../store';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  GraduationCap, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Clock,
+  GraduationCap,
   Building2,
   AlertCircle,
   CheckCircle2,
@@ -22,7 +22,8 @@ import {
   ListTodo,
   CheckCircle,
   User,
-  Flag
+  Flag,
+  X,
 } from 'lucide-react';
 import { Event, CSAction, Task } from '../types';
 
@@ -33,6 +34,13 @@ const AgendaView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('mes');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Painel de detalhes do item da agenda
+  type DetailItem =
+    | { kind: 'task'; item: Task }
+    | { kind: 'action'; item: CSAction }
+    | { kind: 'event'; item: Event };
+  const [agendaDetail, setAgendaDetail] = useState<DetailItem | null>(null);
 
   const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
@@ -89,138 +97,209 @@ const AgendaView: React.FC = () => {
     const dayTasks = tasks.filter(t => t.date === ds)
       .sort((a,b) => a.time.localeCompare(b.time));
 
-    return (
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 flex-1 animate-in fade-in slide-in-from-bottom-4">
-        <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
-          <CalendarIcon className="text-amber-500" size={24} />
-          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Operações do Dia</h2>
+    // ── Painel de detalhes do item ─────────────────────────────────────────
+    const renderAgendaDetailPanel = () => {
+      if (!agendaDetail) return null;
+      const { kind, item } = agendaDetail;
+
+      let title = '';
+      let badge = '';
+      let badgeColor = '';
+      let rows: { label: string; value: React.ReactNode }[] = [];
+
+      if (kind === 'task') {
+        const t = item as Task;
+        const client = clients.find(c => c.id === t.clientId);
+        title = t.title;
+        badge = 'TAREFA CLIENTE';
+        badgeColor = 'bg-rose-100 text-rose-700';
+        rows = [
+          { label: 'Status', value: <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${t.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{t.completed ? 'Concluída' : 'Pendente'}</span> },
+          { label: 'Horário', value: t.time || '—' },
+          { label: 'Cliente', value: client?.name || '—' },
+          { label: 'Telefone', value: client?.phone || '—' },
+          { label: 'Email', value: client?.email || '—' },
+          { label: 'Descrição', value: t.description || '—' },
+        ];
+      } else if (kind === 'action') {
+        const a = item as CSAction;
+        const cls = classes.find(c => c.id === a.classId);
+        title = `${a.type}`;
+        badge = 'AÇÃO CS';
+        badgeColor = 'bg-amber-100 text-amber-700';
+        rows = [
+          { label: 'Status', value: <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{a.status}</span> },
+          { label: 'Canal', value: a.channel },
+          { label: 'Projeto', value: cls?.name || '—' },
+          { label: 'Período', value: `${a.startDate} → ${a.endDate}` },
+          { label: 'Alcançados', value: a.totalReached?.toLocaleString() || '0' },
+          { label: 'Respostas', value: a.totalResponses?.toLocaleString() || '0' },
+          { label: 'Vendas', value: a.volumeSold?.toLocaleString() || '0' },
+          { label: 'ROI', value: `R$ ${a.revenueResult?.toLocaleString() || '0'}` },
+        ];
+      } else {
+        const e = item as Event;
+        const cls = classes.find(c => c.id === e.classId);
+        const time = new Date(e.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const endTime = new Date(e.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        title = e.name;
+        badge = e.type || 'EVENTO';
+        badgeColor = 'bg-slate-100 text-slate-700';
+        rows = [
+          { label: 'Status', value: <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${e.status === 'Confirmado' ? 'bg-emerald-100 text-emerald-700' : e.status === 'Realizado' ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>{e.status}</span> },
+          { label: 'Início', value: time },
+          { label: 'Término', value: endTime },
+          { label: 'Projeto', value: cls?.name || '—' },
+          { label: 'Atividades', value: e.activities?.length ? `${e.activities.length} atividade(s)` : '—' },
+        ];
+      }
+
+      return (
+        <div className="w-80 flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+          {/* Header */}
+          <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mt-1.5 leading-tight">{title}</h3>
+            </div>
+            <button onClick={() => setAgendaDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl flex-shrink-0 transition-all">
+              <X size={14}/>
+            </button>
+          </div>
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-3">
+            {rows.map(row => (
+              <div key={row.label} className="flex items-start justify-between gap-3">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex-shrink-0 mt-0.5">{row.label}</span>
+                <span className="text-[10px] font-bold text-slate-700 text-right">{row.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        
-        {(dayEvents.length > 0 || dayActions.length > 0 || dayTasks.length > 0) ? (
-          <div className="space-y-6 relative">
-            <div className="absolute left-[39px] top-2 bottom-2 w-0.5 bg-slate-100" />
-            
-            {/* Tarefas de Clientes */}
-            {dayTasks.map(t => {
+      );
+    };
+
+    return (
+      <div className={`flex gap-4 flex-1 min-h-0 ${agendaDetail ? '' : ''}`}>
+        {/* Lista principal */}
+        <div className={`${agendaDetail ? 'flex-1 min-w-0' : 'w-full'} bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 flex-1 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 transition-all`}>
+          <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
+            <CalendarIcon className="text-amber-500" size={24} />
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Operações do Dia</h2>
+          </div>
+
+          {(dayEvents.length > 0 || dayActions.length > 0 || dayTasks.length > 0) ? (
+            <div className="space-y-6 relative">
+              <div className="absolute left-[39px] top-2 bottom-2 w-0.5 bg-slate-100" />
+
+              {/* Tarefas de Clientes */}
+              {dayTasks.map(t => {
                 const client = clients.find(c => c.id === t.clientId);
+                const isSelected = agendaDetail?.kind === 'task' && agendaDetail.item.id === t.id;
                 return (
-                  <div key={t.id} className="relative pl-20 group">
+                  <div key={t.id} className="relative pl-20 group cursor-pointer" onClick={() => setAgendaDetail(isSelected ? null : { kind: 'task', item: t })}>
                     <div className="absolute left-0 top-1 w-20 text-right pr-6 text-xs font-black text-slate-400">
                       {t.time}
                     </div>
                     <div className={`absolute left-[33px] top-1.5 w-4 h-4 rounded-full border-4 border-white z-10 ${t.completed ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                    
-                    <div className={`rounded-3xl p-5 border transition-all ${t.completed ? 'bg-emerald-50 border-emerald-100 opacity-60' : 'bg-white border-slate-100 hover:border-rose-200 shadow-sm'}`}>
+                    <div className={`rounded-3xl p-5 border transition-all ${isSelected ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-200' : t.completed ? 'bg-emerald-50 border-emerald-100 opacity-60' : 'bg-white border-slate-100 hover:border-rose-200 shadow-sm'}`}>
                       <div className="flex items-center justify-between gap-4">
-                         <div>
-                            <div className="flex items-center gap-2 mb-1">
-                               <span className="text-[9px] font-black uppercase text-rose-600 tracking-widest flex items-center gap-1">
-                                  <ListTodo size={12}/> TAREFA CLIENTE
-                               </span>
-                            </div>
-                            <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{t.title}</h4>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Vinc: {client?.name || 'N/A'}</p>
-                         </div>
-                         <CheckCircle2 className={`opacity-20 ${t.completed ? 'text-emerald-500' : 'text-rose-400'}`} size={32} />
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-black uppercase text-rose-600 tracking-widest flex items-center gap-1">
+                              <ListTodo size={12}/> TAREFA CLIENTE
+                            </span>
+                          </div>
+                          <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{t.title}</h4>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Vinc: {client?.name || 'N/A'}</p>
+                        </div>
+                        <CheckCircle2 className={`opacity-20 group-hover:opacity-60 transition-all ${t.completed ? 'text-emerald-500' : 'text-rose-400'}`} size={32} />
                       </div>
                     </div>
                   </div>
                 );
-            })}
+              })}
 
-            {/* Ações do CS (Campanhas) */}
-            {dayActions.map(a => {
-               const cls = classes.find(c => c.id === a.classId);
-               const isStart = a.startDate === ds;
-               const isEnd = a.endDate === ds;
-               return (
-                <div key={a.id} className="relative pl-20 group">
-                  <div className="absolute left-0 top-1 w-20 text-right pr-6 text-[9px] font-black text-amber-500 uppercase leading-tight">
-                    {isStart && isEnd ? 'DIA ÚNICO' : isStart ? 'INÍCIO' : isEnd ? 'FINAL' : 'EM CURSO'}
-                  </div>
-                  <div className="absolute left-[33px] top-1.5 w-4 h-4 rounded-full border-4 border-white z-10 bg-amber-500" />
-                  
-                  <div className="bg-amber-50 rounded-3xl p-5 border border-amber-200 group-hover:bg-amber-100 transition-all shadow-sm">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border border-amber-300 bg-white text-amber-700 shadow-sm">
-                            {a.status}
-                          </span>
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                             <Zap size={10}/> AÇÃO CS
-                          </span>
+              {/* Ações do CS (Campanhas) */}
+              {dayActions.map(a => {
+                const cls = classes.find(c => c.id === a.classId);
+                const isStart = a.startDate === ds;
+                const isEnd = a.endDate === ds;
+                const isSelected = agendaDetail?.kind === 'action' && agendaDetail.item.id === a.id;
+                return (
+                  <div key={a.id} className="relative pl-20 group cursor-pointer" onClick={() => setAgendaDetail(isSelected ? null : { kind: 'action', item: a })}>
+                    <div className="absolute left-0 top-1 w-20 text-right pr-6 text-[9px] font-black text-amber-500 uppercase leading-tight">
+                      {isStart && isEnd ? 'DIA ÚNICO' : isStart ? 'INÍCIO' : isEnd ? 'FINAL' : 'EM CURSO'}
+                    </div>
+                    <div className="absolute left-[33px] top-1.5 w-4 h-4 rounded-full border-4 border-white z-10 bg-amber-500" />
+                    <div className={`rounded-3xl p-5 border transition-all shadow-sm ${isSelected ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-200' : 'bg-amber-50 border-amber-200 hover:bg-amber-100'}`}>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border border-amber-300 bg-white text-amber-700 shadow-sm">{a.status}</span>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Zap size={10}/> AÇÃO CS</span>
+                          </div>
+                          <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{a.type} • {cls?.name}</h4>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase">
+                              <Target size={14} className="text-amber-500" /> Canal: {a.channel}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase">
+                              <TrendingUp size={14} /> ROI: R$ {a.revenueResult.toLocaleString()}
+                            </div>
+                          </div>
                         </div>
-                        <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{a.type} • {cls?.name}</h4>
-                        <div className="flex items-center gap-4 mt-2">
-                           <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase">
-                             <Target size={14} className="text-amber-500" />
-                             Canal: {a.channel}
-                           </div>
-                           <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase">
-                             <TrendingUp size={14} />
-                             ROI: R$ {a.revenueResult.toLocaleString()}
-                           </div>
-                        </div>
+                        <Zap className="text-amber-400 opacity-20 group-hover:opacity-100 transition-all" size={32} />
                       </div>
-                      <Zap className="text-amber-400 opacity-20 group-hover:opacity-100 transition-all" size={32} />
                     </div>
                   </div>
-                </div>
-               );
-            })}
+                );
+              })}
 
-            {/* Eventos Pontuais (Reuniões, Eventos Turma) */}
-            {dayEvents.map(e => {
-              const cls = classes.find(c => c.id === e.classId);
-              const time = new Date(e.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              
-              let statusStyle = "bg-slate-500";
-              let statusLabelStyle = "bg-slate-50 text-slate-700 border-slate-100";
-              if (e.status === 'Confirmado') {
-                statusStyle = "bg-emerald-500";
-                statusLabelStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
-              } else if (e.status === 'Realizado') {
-                statusStyle = "bg-slate-700";
-                statusLabelStyle = "bg-slate-100 text-slate-700 border-slate-200";
-              }
-
-              return (
-                <div key={e.id} className="relative pl-20 group">
-                  <div className="absolute left-0 top-1 w-20 text-right pr-6 text-xs font-black text-slate-400 group-hover:text-slate-600 transition-colors">
-                    {time}
-                  </div>
-                  <div className={`absolute left-[33px] top-1.5 w-4 h-4 rounded-full border-4 border-white z-10 ${statusStyle}`} />
-                  
-                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 hover:border-amber-400 hover:bg-white transition-all shadow-sm">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border ${statusLabelStyle}`}>
-                            {e.status}
-                          </span>
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{e.type}</span>
-                        </div>
-                        <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{e.name}</h4>
-                        <div className="flex items-center gap-4 mt-2">
-                           <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase">
-                             <GraduationCap size={14} className="text-slate-300" />
-                             {cls?.name || 'Turma não vinculada'}
-                           </div>
+              {/* Eventos Pontuais */}
+              {dayEvents.map(e => {
+                const cls = classes.find(c => c.id === e.classId);
+                const time = new Date(e.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                let statusStyle = "bg-slate-500";
+                let statusLabelStyle = "bg-slate-50 text-slate-700 border-slate-100";
+                if (e.status === 'Confirmado') { statusStyle = "bg-emerald-500"; statusLabelStyle = "bg-emerald-50 text-emerald-700 border-emerald-100"; }
+                else if (e.status === 'Realizado') { statusStyle = "bg-slate-700"; statusLabelStyle = "bg-slate-100 text-slate-700 border-slate-200"; }
+                const isSelected = agendaDetail?.kind === 'event' && agendaDetail.item.id === e.id;
+                return (
+                  <div key={e.id} className="relative pl-20 group cursor-pointer" onClick={() => setAgendaDetail(isSelected ? null : { kind: 'event', item: e })}>
+                    <div className="absolute left-0 top-1 w-20 text-right pr-6 text-xs font-black text-slate-400 group-hover:text-slate-600 transition-colors">{time}</div>
+                    <div className={`absolute left-[33px] top-1.5 w-4 h-4 rounded-full border-4 border-white z-10 ${statusStyle}`} />
+                    <div className={`rounded-3xl p-5 border transition-all shadow-sm ${isSelected ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-200' : 'bg-slate-50 border-slate-200 hover:border-amber-400 hover:bg-white'}`}>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border ${statusLabelStyle}`}>{e.status}</span>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{e.type}</span>
+                          </div>
+                          <h4 className="text-base font-black text-slate-900 uppercase tracking-tight">{e.name}</h4>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase">
+                              <GraduationCap size={14} className="text-slate-300" />
+                              {cls?.name || 'Projeto não vinculado'}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="py-24 flex flex-col items-center justify-center text-slate-300">
-            <CalendarIcon size={64} className="mb-4 opacity-10" />
-            <p className="font-black text-xs uppercase tracking-widest">Nenhuma operação detectada para este dia.</p>
-          </div>
-        )}
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-24 flex flex-col items-center justify-center text-slate-300">
+              <CalendarIcon size={64} className="mb-4 opacity-10" />
+              <p className="font-black text-xs uppercase tracking-widest">Nenhuma operação detectada para este dia.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Painel lateral de detalhes (sem backdrop) */}
+        {renderAgendaDetailPanel()}
       </div>
     );
   };

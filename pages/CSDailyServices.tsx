@@ -78,7 +78,7 @@ const ServiceModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.clientPhone || !formData.summary) return;
+    if (!formData.clientPhone) return;
 
     if (serviceToEdit) {
       updateCSDailyService(formData as CSDailyService);
@@ -231,9 +231,8 @@ const ServiceModal: React.FC<{
 
             {/* Resumo da conversa (mapeado para summary) */}
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">8. Resumo da Conversa *</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">8. Resumo da Conversa</label>
               <textarea
-                required
                 placeholder="Relate o que foi tratado..."
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none min-h-[90px]"
                 value={formData.summary}
@@ -408,6 +407,7 @@ const CSDailyServicesView: React.FC = () => {
   const [serviceToEdit, setServiceToEdit] = useState<CSDailyService | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [selectedService, setSelectedService] = useState<CSDailyService | null>(null);
 
   const handleBulkImport = (data: any[]) => {
     const today = new Date().toISOString().split('T')[0];
@@ -434,7 +434,7 @@ const CSDailyServicesView: React.FC = () => {
     { key: 'clientPhone',       label: 'Telefone do Contato',         required: true },
     { key: 'clientNameManual',  label: 'Nome Manual (opcional)' },
     { key: 'type',              label: 'Canal de Atendimento',        required: true },
-    { key: 'summary',           label: 'Resumo',                      required: true },
+    { key: 'summary',           label: 'Resumo' },
     { key: 'status',            label: 'Status' },
     { key: 'responsibleUserId', label: 'ID do Responsável (opcional)' },
   ];
@@ -543,7 +543,8 @@ const CSDailyServicesView: React.FC = () => {
          </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+      <div className={`flex gap-4 flex-1 min-h-0 overflow-hidden`}>
+      <div className={`flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0 transition-all ${selectedService ? 'w-1/2' : 'w-full'}`}>
         <div className="flex-1 overflow-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -569,7 +570,7 @@ const CSDailyServicesView: React.FC = () => {
                 const demandType = demandTypes.find(d => d.id === service.demandTypeId);
 
                 return (
-                  <tr key={service.id} className={`hover:bg-amber-50/30 transition-colors group ${selectedIds.has(service.id) ? 'bg-amber-50' : ''}`}>
+                  <tr key={service.id} onClick={() => setSelectedService(prev => prev?.id === service.id ? null : service)} className={`hover:bg-amber-50/30 transition-colors group cursor-pointer ${selectedIds.has(service.id) ? 'bg-amber-50' : ''} ${selectedService?.id === service.id ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/60' : ''}`}>
                     <td className="px-4 py-5">
                       <button onClick={() => toggleSelect(service.id)} className="text-slate-400 hover:text-amber-600 transition-colors">
                         {selectedIds.has(service.id) ? <CheckSquare size={16} className="text-amber-500"/> : <Square size={16}/>}
@@ -640,7 +641,7 @@ const CSDailyServicesView: React.FC = () => {
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-5 text-right" onClick={e => e.stopPropagation()}>
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                           {perms.canEdit && (
                             <button onClick={() => { setServiceToEdit(service); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 transition-all hover:bg-white rounded-xl shadow-sm">
@@ -671,6 +672,100 @@ const CSDailyServicesView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* ── Painel de detalhes (sem backdrop) ── */}
+      {selectedService && (() => {
+        const svc = selectedService;
+        const client = clients.find(c => c.id === svc.clientId);
+        const cls = classes.find(cl => cl.id === (svc.classId || client?.classId));
+        const user = users.find(u => u.id === svc.responsibleUserId);
+        const demandType = demandTypes.find(d => d.id === svc.demandTypeId);
+        const Field: React.FC<{ label: string; value?: string | null; accent?: string }> = ({ label, value, accent }) =>
+          value ? (
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+              <p className={`text-sm font-bold ${accent || 'text-slate-800'} leading-snug`}>{value}</p>
+            </div>
+          ) : null;
+        return (
+          <div className="w-[380px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in slide-in-from-right-4 duration-200">
+            {/* Header do painel */}
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{new Date(svc.date + 'T12:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })}</p>
+                <h3 className="text-sm font-black text-slate-900 uppercase leading-tight">{client?.name || svc.clientNameManual || 'Sem identificação'}</h3>
+                <p className="text-xs text-slate-400 font-bold mt-0.5">{svc.clientPhone}</p>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                {perms.canEdit && (
+                  <button onClick={() => { setServiceToEdit(svc); setIsModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all" title="Editar">
+                    <Edit3 size={16}/>
+                  </button>
+                )}
+                <button onClick={() => setSelectedService(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all">
+                  <X size={16}/>
+                </button>
+              </div>
+            </div>
+
+            {/* Corpo do painel */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+              {/* Status badges */}
+              <div className="flex flex-wrap gap-2">
+                <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full border ${svc.status === 'Concluído' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{svc.status}</span>
+                {svc.repasse && <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200">Repasse{svc.repasseSetor ? `: ${svc.repasseSetor}` : ''}</span>}
+                {svc.remarketing && <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Remarketing</span>}
+                {svc.retorno && <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Retorno: {new Date(svc.retorno + 'T12:00').toLocaleDateString('pt-BR')}</span>}
+                {svc.valorVenda ? <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">R$ {svc.valorVenda.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span> : null}
+              </div>
+
+              {/* Canais e tipo */}
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-4">
+                <Field label="Canal Contatado" value={svc.canalContatado} />
+                <Field label="Canal Atendimento" value={svc.type} />
+                <Field label="Tipo de Demanda" value={demandType?.name} accent={demandType ? undefined : undefined} />
+                <Field label="Responsável" value={user?.name} />
+              </div>
+
+              {/* Projeto / Cliente */}
+              {(client || cls) && (
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+                  <Field label="Cliente vinculado" value={client?.name} accent="text-slate-900 font-black" />
+                  <Field label="Projeto" value={cls?.name} />
+                </div>
+              )}
+
+              {/* Conteúdo */}
+              {svc.summary && (
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo da Conversa</p>
+                  <p className="text-sm text-slate-700 font-medium leading-relaxed bg-slate-50 rounded-2xl p-4 border border-slate-100">{svc.summary}</p>
+                </div>
+              )}
+              {svc.resolucao && (
+                <div>
+                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Resolução</p>
+                  <p className="text-sm text-emerald-800 font-medium leading-relaxed bg-emerald-50 rounded-2xl p-4 border border-emerald-100">{svc.resolucao}</p>
+                </div>
+              )}
+              {svc.obs && (
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Observações</p>
+                  <p className="text-sm text-slate-600 font-medium leading-relaxed">{svc.obs}</p>
+                </div>
+              )}
+              {svc.objecao && (
+                <div>
+                  <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">Objeção</p>
+                  <p className="text-sm text-rose-700 font-medium leading-relaxed">{svc.objecao}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+      </div>{/* fecha o flex-wrapper */}
 
       {selectedIds.size > 0 && perms.canDelete && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl">

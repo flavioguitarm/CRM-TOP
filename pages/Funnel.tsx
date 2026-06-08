@@ -614,7 +614,7 @@ const FunnelView: React.FC = () => {
       {isNewLeadModalOpen && <NewLeadModal funnelId={selectedFunnelId} onClose={() => setIsNewLeadModalOpen(false)} />}
 
       {selectedClientId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-end" onClick={() => setSelectedClientId(null)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-end" onClick={() => setSelectedClientId(null)}>
           <div className="h-full w-full max-w-lg bg-white shadow-2xl animate-in slide-in-from-right duration-500 flex flex-col" onClick={e => e.stopPropagation()}>
              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10 shadow-sm">
                 <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Perfil da Negociação</h2>
