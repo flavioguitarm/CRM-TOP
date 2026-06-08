@@ -137,7 +137,7 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
   const [formData, setFormData] = useState<Partial<Client>>(client || {
     name: '', birthDate: '', gender: '', cpf: '', email: '', phone: '',
     institutionId: '', campus: '', courseId: '', classId: '', shift: '', tags: [],
-    funnelId: '', stageId: '', totalValue: 0, purchasesCount: 0, activities: [], createdAt: new Date().toISOString().split('T')[0], sellerId: currentUser?.id || '1'
+    funnelId: '', stageId: '', totalValue: 0, purchasesCount: 0, activities: [], createdAt: new Date().toISOString().split('T')[0], sellerId: currentUser?.id || ''
   });
   const [tagsInput, setTagsInput] = useState(client?.tags?.join(', ') || '');
 
@@ -267,8 +267,8 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Contato</h4>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">E-mail * <HelpTooltip text="E-mail principal para envio de comunicados, propostas e confirmações. Deve ser único na base." /></label>
-                <input required className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold ${duplicateCheck.email ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200'}`} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-1">E-mail <HelpTooltip text="E-mail principal para envio de comunicados, propostas e confirmações. Deve ser único na base." /></label>
+                <input className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold ${duplicateCheck.email ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200'}`} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 {duplicateCheck.email && <p className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1"><AlertCircle size={10}/> E-mail já existe na base!</p>}
               </div>
               <div className="space-y-1">
@@ -442,7 +442,7 @@ const ClientsView: React.FC = () => {
             createdAt: today,
             totalValue: 0,
             purchasesCount: 0,
-            sellerId: currentUser?.id || '1',
+            sellerId: currentUser?.id || '',
             tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()) : [],
             funnelId: item.funnelId || 'f-vendas',
             stageId: item.stageId || 's1'
@@ -464,7 +464,7 @@ const ClientsView: React.FC = () => {
                 status: isSale ? 'GANHO' : (isLost ? 'PERDIDO' : 'ABERTO'),
                 createdAt: today,
                 closedAt: isSale ? item.soldDate : (isLost ? item.lostDate : undefined),
-                sellerId: currentUser?.id || '1'
+                sellerId: currentUser?.id || ''
              };
              addNegotiation(neg);
 
@@ -476,8 +476,8 @@ const ClientsView: React.FC = () => {
                     value: parseFloat(item.soldValue),
                     quantity: parseInt(item.quantity) || 1,
                     date: item.soldDate,
-                    classId: item.classId || 't-1',
-                    sellerId: currentUser?.id || '1',
+                    classId: item.classId || '',
+                    sellerId: currentUser?.id || '',
                     negotiationId: negId
                 };
                 addSale(sale);
@@ -540,7 +540,7 @@ const ClientsView: React.FC = () => {
 
   const importFields = [
     { key: 'name', label: 'Nome Completo', required: true },
-    { key: 'email', label: 'E-mail', required: true },
+    { key: 'email', label: 'E-mail' },
     { key: 'phone', label: 'Telefone' },
     { key: 'cpf', label: 'CPF' },
     { key: 'birthDate', label: 'Nascimento (AAAA-MM-DD)' },

@@ -191,9 +191,9 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
       quantity: qty,
       status: 'ABERTO',
       createdAt: new Date().toISOString().split('T')[0],
-      sellerId: currentUser?.id || '1'
+      sellerId: currentUser?.id || ''
     };
-    
+
     addNegotiation(neg);
 
     const activity: Activity = {
@@ -212,7 +212,7 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
       id: `sale-${Date.now()}`,
       clientId: client.id,
       productId: neg.productId,
-      sellerId: currentUser?.id || '1',
+      sellerId: currentUser?.id || '',
       value: neg.value,
       quantity: neg.quantity,
       date: new Date().toISOString().split('T')[0],

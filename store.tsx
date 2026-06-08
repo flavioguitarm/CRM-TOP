@@ -347,14 +347,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
-  // Rastreia o tenant_id a partir da sessão Supabase Auth
+  // Rastreia o tenant_id a partir do org_id em user_organizations
+  // (NÃO usa auth.uid() diretamente — o RLS usa current_org_id() que vem desta tabela)
   useEffect(() => {
+    const resolveOrgId = async (userId: string | undefined) => {
+      if (!userId) { setTenantId(null); return; }
+      const { data, error } = await supabase
+        .from('user_organizations')
+        .select('org_id')
+        .eq('user_id', userId)
+        .single();
+      if (error || !data?.org_id) {
+        console.warn('resolveOrgId: org_id não encontrado para user', userId, error?.message);
+        // Fallback: usa o próprio userId como tenant (usuário sem org ainda)
+        setTenantId(userId);
+        return;
+      }
+      setTenantId(data.org_id);
+    };
+
     supabase.auth.getSession().then(({ data }) => {
-      setTenantId(data.session?.user.id ?? null);
+      resolveOrgId(data.session?.user.id);
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setTenantId(session?.user.id ?? null);
+      resolveOrgId(session?.user.id);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -1112,7 +1131,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     tags:            c.tags        ?? [],
     total_value:     c.totalValue  ?? 0,
     purchases_count: c.purchasesCount ?? 0,
-    seller_id:       c.sellerId    || null,
+    seller_id:       null, // TODO: implementar seller corretamente — forçado null por ora para evitar FK violation
   });
 
   const addClient = (client: Client) => {

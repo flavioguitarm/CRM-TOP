@@ -73,7 +73,7 @@ const NewLeadModal: React.FC<{
     name: '', email: '', phone: '', cpf: '', birthDate: '', gender: '',
     institutionId: '', campus: '', courseId: '', classId: '', shift: '', tags: [],
     funnelId: funnelId, stageId: currentFunnel?.stages[0]?.id || '',
-    totalValue: 0, purchasesCount: 0, activities: [], createdAt: new Date().toISOString().split('T')[0], sellerId: currentUser?.id || '1'
+    totalValue: 0, purchasesCount: 0, activities: [], createdAt: new Date().toISOString().split('T')[0], sellerId: currentUser?.id || ''
   });
   const [tagsInput, setTagsInput] = useState('');
 
