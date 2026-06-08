@@ -11,6 +11,22 @@ import {
 } from 'lucide-react';
 
 const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+
+// Converte serial Excel (número de dias desde 01/01/1900) ou string para ISO date (AAAA-MM-DD)
+const excelDateToISO = (value: any): string | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+  }
+  if (typeof value === 'number' && value > 0) {
+    const corrected = value > 59 ? value - 1 : value; // corrige bug bissexto do Excel
+    const ms = (corrected - 25569) * 86400 * 1000;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+  }
+  return null;
+};
 import { CSDailyService } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -499,7 +515,7 @@ const CSDailyServicesView: React.FC = () => {
       if (!item.clientPhone) continue;
       const service: CSDailyService = {
         id:                crypto.randomUUID(),
-        date:              item.date || today,
+        date:              excelDateToISO(item.date) || today,
         type:              item.type || 'WhatsApp',
         clientPhone:       item.clientPhone,
         clientNameManual:  item.clientNameManual || '',

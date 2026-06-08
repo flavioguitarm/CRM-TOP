@@ -13,7 +13,23 @@ import BulkImportModal from '../../components/BulkImportModal';
 import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
-const SearchableSelect: React.FC<{ 
+// Converte serial Excel (número de dias desde 01/01/1900) ou string para ISO datetime
+const excelDateToISO = (value: any): string | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (typeof value === 'number' && value > 0) {
+    const corrected = value > 59 ? value - 1 : value; // corrige bug bissexto do Excel
+    const ms = (corrected - 25569) * 86400 * 1000;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  return null;
+};
+
+const SearchableSelect: React.FC<{
   options: { id: string; label: string }[]; 
   value: string; 
   onChange: (v: string) => void; 
@@ -268,11 +284,16 @@ const EventosAdmin: React.FC = () => {
 
   const handleBulkImport = async (data: any[]) => {
     for (const item of data) {
+      const safeStart = excelDateToISO(item.startDateTime);
+      if (!safeStart) continue; // startDateTime é obrigatório
+      const safeEnd = excelDateToISO(item.endDateTime) ?? safeStart;
       await addEvent({
         ...item,
-        id: crypto.randomUUID(),
-        status: item.status || 'Previsão',
-        activities: []
+        id:            crypto.randomUUID(),
+        startDateTime: safeStart,
+        endDateTime:   safeEnd,
+        status:        item.status || 'Previsão',
+        activities:    []
       } as Event);
     }
   };

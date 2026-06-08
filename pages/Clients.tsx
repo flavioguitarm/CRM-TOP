@@ -317,7 +317,7 @@ const ClientModal: React.FC<{ client?: Client | null; onClose: () => void; onSav
 };
 
 const ClientsView: React.FC = () => {
-  const { clients, institutions, classes, currentUser, addClient, updateClient, addSale, updateSale, courses, sales, negotiations, products, addNegotiation, updateNegotiationStatus, moveToTrash } = useData();
+  const { clients, institutions, classes, currentUser, addClient, updateClient, addSale, updateSale, courses, sales, negotiations, products, addNegotiation, updateNegotiationStatus, moveToTrash, funnels } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -393,8 +393,39 @@ const ClientsView: React.FC = () => {
     return found?.id || '';
   };
 
+  // ── Converte serial Excel (número de dias desde 01/01/1900) para ISO date string ──
+  // O Excel armazena datas como número decimal: parte inteira = dias, parte fracionária = hora.
+  // 25569 = distância entre 01/01/1900 e 01/01/1970 (epoch Unix), corrigindo o bug do Excel
+  // que trata 1900 como ano bissexto (adiciona +1 dia extra).
+  const excelDateToISO = (value: any): string | null => {
+    if (value === null || value === undefined || value === '') return null;
+    // Já é string de data — valida e retorna
+    if (typeof value === 'string') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    }
+    // Número serial do Excel
+    if (typeof value === 'number' && value > 0) {
+      // Corrige o bug bissexto do Excel: datas após 28/02/1900 têm 1 dia a mais
+      const corrected = value > 59 ? value - 1 : value;
+      const ms = (corrected - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    }
+    return null;
+  };
+
+  // ── UUID válido? (36 chars com hifens no padrão 8-4-4-4-12) ─────────────────
+  const isValidUUID = (v: any): boolean =>
+    typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
   const handleBulkImport = async (data: any[], strategy: 'ignore' | 'overwrite') => {
     const today = new Date().toISOString().split('T')[0];
+
+    // Primeiro funil e estágio reais do banco — fallback seguro para FKs UUID
+    const defaultFunnel = funnels[0];
+    const defaultFunnelId = defaultFunnel?.id ?? null;
+    const defaultStageId  = defaultFunnel?.stages?.[0]?.id ?? null;
 
     for (const item of data) {
       // ── Vinculação inteligente: resolve nomes → IDs ──────────────────────────
@@ -409,11 +440,23 @@ const ClientsView: React.FC = () => {
         ? linkedClass.courseIds[0]
         : resolvedCourseId;
 
+      // ── Sanitiza campos UUID: aceita somente UUID válido, senão null ─────────
+      const safeFunnelId = isValidUUID(item.funnelId) ? item.funnelId : defaultFunnelId;
+      const safeStageId  = isValidUUID(item.stageId)  ? item.stageId  : defaultStageId;
+
+      // ── Converte todos os campos de data (serial Excel → ISO string) ─────────
+      const safeBirthDate = excelDateToISO(item.birthDate);
+      const safeSoldDate  = excelDateToISO(item.soldDate);
+      const safeLostDate  = excelDateToISO(item.lostDate);
+
       const enrichedItem = {
         ...item,
         classId:       resolvedClassId,
         institutionId: finalInstId,
         courseId:      finalCourseId,
+        birthDate:     safeBirthDate,
+        soldDate:      safeSoldDate,
+        lostDate:      safeLostDate,
       };
 
       const existingClient = clients.find(c =>
@@ -444,8 +487,8 @@ const ClientsView: React.FC = () => {
             purchasesCount: 0,
             sellerId: currentUser?.id || '',
             tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()) : [],
-            funnelId: item.funnelId || 'f-vendas',
-            stageId: item.stageId || 's1'
+            funnelId: safeFunnelId,
+            stageId:  safeStageId,
           } as Client;
 
           // Aguarda persistência antes de passar ao próximo — evita rate-limit e garante ordem
@@ -453,8 +496,8 @@ const ClientsView: React.FC = () => {
 
           if (item.soldProductId && item.soldValue) {
              const negId = crypto.randomUUID();
-             const isSale = !!item.soldDate;
-             const isLost = !!item.lostDate;
+             const isSale = !!safeSoldDate;
+             const isLost = !!safeLostDate;
 
              const neg: ProductNegotiation = {
                 id: negId,
@@ -464,7 +507,7 @@ const ClientsView: React.FC = () => {
                 quantity: parseInt(item.quantity) || 1,
                 status: isSale ? 'GANHO' : (isLost ? 'PERDIDO' : 'ABERTO'),
                 createdAt: today,
-                closedAt: isSale ? item.soldDate : (isLost ? item.lostDate : undefined),
+                closedAt: isSale ? safeSoldDate! : (isLost ? safeLostDate! : undefined),
                 sellerId: currentUser?.id || ''
              };
              addNegotiation(neg);
@@ -476,8 +519,8 @@ const ClientsView: React.FC = () => {
                     productId: item.soldProductId,
                     value: parseFloat(item.soldValue),
                     quantity: parseInt(item.quantity) || 1,
-                    date: item.soldDate,
-                    classId: item.classId || '',
+                    date: safeSoldDate!,
+                    classId: resolvedClassId || '',
                     sellerId: currentUser?.id || '',
                     negotiationId: negId
                 };
