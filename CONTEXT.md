@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-08 (Sessão 13 — concluída)
+> Atualizado em: 2026-06-08 (Sessão 14 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1087,44 +1087,129 @@ CREATE POLICY "tenant_isolate_project_activities" ON public.project_activities
 
 ---
 
-## 🗺️ Próximos passos (Sessão 14+)
+## ✅ Sessão 14 — Timeline de Atividades, Dashboard e Verificação Cruzada (2026-06-08)
 
-### 1. Timeline de Atividades (plano aprovado — SQL já aplicado)
+### 🕐 Timeline de Atividades
 
-**Infraestrutura já pronta:**
-- `client_activities.user_id UUID` — coluna adicionada
-- `project_activities` — tabela criada com RLS
+#### `types.ts`
+- `Activity` recebeu `userId?: string` e dois novos tipos: `'move'` e `'sale'`
+- Novo interface `ProjectActivity` com campos `id`, `projectId`, `type`, `description`, `userId?`, `timestamp`
 
-**O que falta implementar:**
-
-| # | Arquivo | Mudança |
-|---|---------|---------|
-| 1 | `types.ts` | Adicionar `userId?: string` em `Activity`; novo interface `ProjectActivity` |
-| 2 | `components/ActivityTimeline.tsx` | **Novo** — recebe `entries: Activity[]`, `users: User[]`, `onAddNote: (text) => void`, `isReadOnly?: boolean` |
-| 3 | `store.tsx` | `addClientActivity` passa `user_id: currentUser?.id`; adiciona `projectActivities`, fetch e `addProjectActivity` |
-| 4 | `components/ClientProfileView.tsx` | Substitui seção "Histórico de Atividades" pelo `<ActivityTimeline>` |
-| 5 | `pages/Admin/Turmas.tsx` | Adiciona seção "Notas / Timeline" no painel de detalhes |
-
-**Visual do componente:**
-- Ícone por tipo: `MessageSquare` (note), `Phone` (call), `Mail` (email), `Users` (meeting), `ArrowRight` (movimentação), `DollarSign` (venda)
+#### `components/ActivityTimeline.tsx` *(novo)*
+Componente reutilizável com:
 - Linha vertical conectando entradas (timeline clássica)
-- Avatar/nome do usuário por entrada
-- Campo de nota fixo no final
-- Paleta slate/amber consistente com o restante do sistema
+- Ícone por tipo: `MessageSquare` (note), `Phone` (call), `Mail` (email), `Users` (meeting), `ArrowRight` (move), `DollarSign` (sale)
+- Badge colorido por tipo (slate, amber, blue, violet, sky, emerald)
+- Nome do usuário responsável por entrada (lookup via `users[]`)
+- Data/hora formatada (`toLocaleString pt-BR`)
+- Campo textarea + select de tipo + botão "Registrar" (hidden quando `isReadOnly`)
+- `maxVisible` prop com botão "Ver todas (N)" / "Mostrar menos"
+- Props: `entries`, `users`, `onAddNote`, `isReadOnly`, `maxVisible`
 
-### 2. Dashboard melhorado
-- Custos × Faturamento por período (gráfico de barras)
-- Campanhas em destaque (top ações CS por ROI)
-- Indicadores de conversão por funil
+#### `store.tsx`
+- `addClientActivity`: enriquece activity com `userId: currentUser?.id` antes de persistir; inclui `user_id` no insert do Supabase
+- Estado `projectActivities: ProjectActivity[]` adicionado
+- `useEffect` de fetch da tabela `project_activities` (ordenado por `timestamp DESC`)
+- `addProjectActivity(projectId, entry)`: async com optimistic update + rollback; persiste na tabela `project_activities`
+- `ProjectActivity` importado de `./types`
+- Interface `DataContext` atualizada com `projectActivities` e `addProjectActivity`
+- Ambos expostos no Provider value
+
+#### `components/ClientProfileView.tsx`
+- Import `ActivityTimeline` adicionado
+- `users` extraído do `useData()`
+- `handleAddActivity` reescrito para receber `(text, type?)` — assinatura compatível com o componente
+- Seção "Histórico de Atividades" substituída por `<ActivityTimeline entries={client.activities} users={users} onAddNote={handleAddActivity} maxVisible={5} />`
+- `HistoryModal` removido (funcionalidade de "ver todas" agora é nativa no componente)
+- `visibleActivities` removido (não mais necessário)
+- `isHistoryModalOpen` removido
+
+#### `pages/Admin/Turmas.tsx`
+- Import `ActivityTimeline` e `MessageSquare` adicionados
+- `projectActivities`, `addProjectActivity`, `currentUser` extraídos do `useData()`
+- Nova seção "Timeline / Notas" inserida entre "Turmas do Projeto" e "Cronograma da Turma"
+- `onAddNote` chama `addProjectActivity(selectedClassId, { type, description, userId: currentUser?.id, timestamp })`
+
+---
+
+### 📊 Dashboard Melhorado
+
+**Novos dados no `Dashboard.tsx`:**
+- `csActions` adicionado ao `useData()`
+- 3 novos `useMemo` calculados independentemente dos filtros de data/funil
+
+**Grid de 3 cards inserida entre os StatCards e os gráficos:**
+
+| Card | Cálculo | Visual |
+|------|---------|--------|
+| **Meta Total dos Projetos** | Soma de `goalQuantity` e `goalValue` de todos os `classProducts` de todos os projetos | Fundo branco, ícone `Target` amber; breakdown Volume + VGV |
+| **Custos × Faturamento** | `csActions[].cost` total vs `sales[].value` total; ROI = `(fat - custo) / custo × 100` | Fundo `slate-900`, barra proporcional, ROI emerald/rose |
+| **Campanhas (Ações CS)** | Total de `csActions`; ativas = status ≠ FEITO/ENCERRADO | Fundo branco, ícone `Megaphone` violet; breakdown ativas/encerradas |
+
+**Novos ícones importados:** `Megaphone`, `TrendingDown`, `BarChart2`
+
+---
+
+### 🔗 Verificação Cruzada Atendimentos × Clientes
+
+#### Helper `normalizePhone`
+```ts
+const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+```
+- Definido em `store.tsx` (dentro do DataProvider) e duplicado em `CSDailyServices.tsx` (escopo de módulo)
+- Usado em **todos** os pontos de comparação de telefone
+
+#### `store.tsx` → `addClient` (ampliado)
+- Comparação de telefone agora usa `normalizePhone` em ambos os lados
+- Retroativo além de setar `clientId` agora também atualiza:
+  - `clientNameManual = client.name`
+  - `classId = client.classId` (apenas para atendimentos sem turma)
+- Supabase: dois updates separados — `client_id + client_name_manual` para todos os órfãos; `class_id` apenas para os sem turma (via `.in('id', orphansWithoutClass.map(o => o.id))`)
+
+#### `store.tsx` → `updateClient` (novo comportamento)
+Ao editar qualquer campo de um cliente, propaga silenciosamente para todos os atendimentos com o mesmo telefone:
+- **Estado local:** `clientId`, `clientNameManual` (cliente sempre vence), `classId` (só preenche se vazio)
+- **Supabase:** `client_id + client_name_manual` para todos os vinculados; `class_id` apenas para os sem turma
+
+#### `CSDailyServices.tsx` → Banner de divergência
+- `normalizePhone` local para comparação no `matchedClient`
+- Estado `divergenceDismissed` controla visibilidade do banner
+- `useMemo divergence`: só calcula quando `serviceToEdit` existe + `matchedClient` existe + não foi descartado
+  - Detecta `nameDiffers`: `serviceToEdit.clientNameManual !== matchedClient.name`
+  - Detecta `classDiffers`: `serviceToEdit.classId !== matchedClient.classId`
+- **Banner âmbar** (não-bloqueante, `animate-in slide-in-from-top-2`):
+  - Mostra os valores divergentes (nome: antes → depois; turma no cliente)
+  - Botão **"Sincronizar com cliente"**: atualiza `formData.clientNameManual` e `classId` + fecha banner
+  - Botão **"Manter atual"**: fecha banner sem alterar dados
+  - Botão ✕: fecha banner
+- Aparece **apenas ao editar** atendimento existente com divergência real
+
+---
+
+## 🗺️ Próximos passos (Sessão 15+)
+
+### 1. Testes gerais e correções de bugs
+- Testar fluxo completo: criar cliente → atendimentos retroativos vinculados
+- Testar atualização de cliente → atendimentos atualizados
+- Testar banner de divergência ao editar atendimento com dados desatualizados
+- Verificar `ActivityTimeline` em Clientes e Turmas com dados reais
+
+### 2. Importação em massa com persistência completa
+- `BulkImportModal` — revisar se atendimentos importados via planilha passam pela verificação cruzada
+- Garantir que IDs gerados na importação são `crypto.randomUUID()` em todos os módulos
 
 ### 3. Deploy online
 - Build de produção + hospedagem (Vercel / Netlify / servidor próprio)
 - Configurar variáveis de ambiente de produção
-- Testar RLS em ambiente limpo
+- Testar RLS em ambiente limpo com múltiplos usuários
 
 ### 4. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
+
+### 5. Integrações futuras
+- **WhatsApp**: integração com API (envio de mensagens a partir de atendimentos)
+- **ARES**: integração com sistema ERP para sincronização de vendas e dados de formandos
 
 ---
 
@@ -1186,3 +1271,16 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 21. **`CANAL_CONTATADO_OPTIONS` (Sessão 12):** fixo em `['API', 'CS1', 'CS2']` em `CSDailyServices.tsx`. Futuramente virá de cadastro (base `channel_types`).
 
 22. **Etapas padrão de funil (Sessão 12):** ao criar qualquer funil (FunnelConfig ou botão "Cadastrar Funil" em Turmas), 5 etapas são auto-inseridas: Sem Contato (#94a3b8), Contatado (#f59e0b), Proposta Enviada (#3b82f6), Negociação (#8b5cf6), Fechamento (#10b981).
+
+23. **`ActivityTimeline` (Sessão 14):** componente reutilizável em `components/ActivityTimeline.tsx`. Props: `entries: Activity[] | ProjectActivity[]`, `users?: User[]`, `onAddNote?: (text, type?) => void`, `isReadOnly?: boolean`, `maxVisible?: number`. Usado em `ClientProfileView.tsx` (histórico de clientes) e `Admin/Turmas.tsx` (notas de projetos). Tabela `project_activities` no Supabase com RLS via `current_org_id()`.
+
+24. **`Activity.type` (Sessão 14):** tipo expandido para `'call' | 'email' | 'meeting' | 'note' | 'move' | 'sale'`. Campo `userId?: string` adicionado. Interface `ProjectActivity` criada em `types.ts`.
+
+25. **`normalizePhone` (Sessão 14):** helper `(phone: string) => phone.replace(/\D/g, '')` definido no DataProvider (`store.tsx`) e no módulo `CSDailyServices.tsx`. Usar em **todos** os pontos de comparação de telefone para evitar divergência por formatação.
+
+26. **Verificação cruzada atendimentos × clientes (Sessão 14):**
+    - `addClient`: retroativo propaga `clientId + clientNameManual + classId` para atendimentos órfãos pelo telefone normalizado
+    - `updateClient`: propaga `clientId + clientNameManual` (cliente sempre vence) e `classId` (apenas se vazio) para todos os atendimentos com mesmo telefone
+    - `ServiceModal` em `CSDailyServices.tsx`: banner âmbar de divergência ao editar atendimento existente cujos dados diferem do cliente vinculado; botões "Sincronizar com cliente" / "Manter atual"
+
+27. **Dashboard (Sessão 14):** 3 cards novos em grid de 3 colunas entre os StatCards e os gráficos: "Meta Total dos Projetos" (soma de `goalValue/goalQuantity` de todos os `classProducts`), "Custos × Faturamento" (ROI geral de `cs_actions` vs `sales`), "Campanhas" (total de `csActions` com breakdown ativas/encerradas). Independentes dos filtros de data/funil do dashboard.
