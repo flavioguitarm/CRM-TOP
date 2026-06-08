@@ -243,7 +243,25 @@ const FunnelConfig: React.FC = () => {
           <form onSubmit={(e) => {
             e.preventDefault();
             if (!newFunnelName.trim()) return;
-            addFunnel({ id: crypto.randomUUID(), name: newFunnelName.trim(), stages: [], responsibleUserIds: [] });
+            const DEFAULT_STAGES = [
+              { name: 'Sem Contato',      color: '#94a3b8' },
+              { name: 'Contatado',        color: '#f59e0b' },
+              { name: 'Proposta Enviada', color: '#3b82f6' },
+              { name: 'Negociação',       color: '#8b5cf6' },
+              { name: 'Fechamento',       color: '#10b981' },
+            ];
+            addFunnel({
+              id: crypto.randomUUID(),
+              name: newFunnelName.trim(),
+              stages: DEFAULT_STAGES.map((s, idx) => ({
+                id: crypto.randomUUID(),
+                name: s.name,
+                order: idx,
+                color: s.color,
+                type: 'NORMAL' as const,
+              })),
+              responsibleUserIds: [],
+            });
             setNewFunnelName(''); setIsAddingFunnel(false);
           }} className="flex gap-3 items-center">
             <GitBranch size={20} className="text-amber-500 flex-shrink-0" />

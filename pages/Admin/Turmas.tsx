@@ -5,7 +5,7 @@ import { useData } from '../../store';
 import {
   Plus, GraduationCap, Calendar as CalendarIcon, Clock, X, Check, Building2, Trash2, Edit3,
   ShoppingCart, Tag, DollarSign, Target, TrendingUp, FileSpreadsheet, Download, ExternalLink,
-  User, Briefcase, Zap, CheckSquare, Square
+  User, Briefcase, Zap, CheckSquare, Square, Users, Pencil, Save, GitBranch
 } from 'lucide-react';
 import BulkImportModal from '../../components/BulkImportModal';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -351,7 +351,7 @@ const ClassProductModal: React.FC<{
 };
 
 const TurmasAdmin: React.FC = () => {
-  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users } = useData();
+  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users, projectClasses, addProjectClass, updateProjectClass, deleteProjectClass, funnels, addFunnel } = useData();
   const navigate = useNavigate();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -360,6 +360,47 @@ const TurmasAdmin: React.FC = () => {
   const [classProductModal, setClassProductModal] = useState<{ open: boolean, edit?: ClassProduct }>({ open: false });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  // ── Estado das Turmas do Projeto ──────────────────────────────────────────
+  const [newPCName, setNewPCName] = useState('');
+  const [editingPCId, setEditingPCId] = useState<string | null>(null);
+  const [editingPCName, setEditingPCName] = useState('');
+
+  // ── Estado do botão "Cadastrar Funil" ─────────────────────────────────────
+  const [funnelMsg, setFunnelMsg] = useState<{ type: 'success' | 'info' | 'error'; text: string } | null>(null);
+
+  const DEFAULT_STAGES = [
+    { name: 'Sem Contato',       color: '#94a3b8' },
+    { name: 'Contatado',         color: '#f59e0b' },
+    { name: 'Proposta Enviada',  color: '#3b82f6' },
+    { name: 'Negociação',        color: '#8b5cf6' },
+    { name: 'Fechamento',        color: '#10b981' },
+  ];
+
+  const handleCadastrarFunil = () => {
+    if (!selectedClass) return;
+    const exists = funnels.find(f => f.name.trim().toLowerCase() === selectedClass.name.trim().toLowerCase());
+    if (exists) {
+      setFunnelMsg({ type: 'info', text: 'Este projeto já possui um funil cadastrado.' });
+      setTimeout(() => setFunnelMsg(null), 4000);
+      return;
+    }
+    const newFunnel = {
+      id: crypto.randomUUID(),
+      name: selectedClass.name.trim(),
+      stages: DEFAULT_STAGES.map((s, idx) => ({
+        id: crypto.randomUUID(),
+        name: s.name,
+        order: idx,
+        color: s.color,
+        type: 'NORMAL' as const,
+      })),
+      responsibleUserIds: [],
+    };
+    addFunnel(newFunnel);
+    setFunnelMsg({ type: 'success', text: `Funil "${newFunnel.name}" criado com 5 etapas padrão!` });
+    setTimeout(() => setFunnelMsg(null), 4000);
+  };
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -547,15 +588,34 @@ const TurmasAdmin: React.FC = () => {
 
       {selectedClassId && selectedClass && (
         <div className="w-[580px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200 overflow-y-auto">
-          <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter">
-              <GraduationCap size={28} className="text-amber-500" /> Perfil da Turma
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10 gap-3">
+            <h2 className="text-xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tighter min-w-0 truncate">
+              <GraduationCap size={24} className="text-amber-500 flex-shrink-0" /> {selectedClass.name}
             </h2>
-            <div className="flex items-center gap-2">
-              <button onClick={() => { setClassToEdit(selectedClass); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>
-              <button onClick={() => setSelectedClassId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={handleCadastrarFunil}
+                className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-amber-500 transition-all"
+                title="Cadastrar Funil para este Projeto"
+              >
+                <GitBranch size={13}/> Cadastrar Funil
+              </button>
+              <button onClick={() => { setClassToEdit(selectedClass); setIsModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={20} /></button>
+              <button onClick={() => setSelectedClassId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={22} /></button>
             </div>
           </div>
+
+          {/* Banner de feedback do funil */}
+          {funnelMsg && (
+            <div className={`mx-6 mt-4 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 animate-in fade-in duration-200 ${
+              funnelMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+              funnelMsg.type === 'info'    ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                            'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              <GitBranch size={14}/>
+              {funnelMsg.text}
+            </div>
+          )}
 
           <div className="p-8 space-y-10 bg-white">
             {/* Novo Retângulo: Eficiência de Vendas ERP vs Meta */}
@@ -793,6 +853,112 @@ const TurmasAdmin: React.FC = () => {
               </div>
             </section>
             
+            {/* ── Turmas do Projeto ─────────────────────────────────────────── */}
+            <section className="space-y-4 pt-6 border-t border-slate-100">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <Users size={14}/> Turmas do Projeto
+              </h4>
+
+              {/* Form: nova turma */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newPCName.trim() || !selectedClassId) return;
+                  await addProjectClass(selectedClassId, newPCName.trim());
+                  setNewPCName('');
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  value={newPCName}
+                  onChange={e => setNewPCName(e.target.value)}
+                  placeholder="Ex: Turma A"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <button
+                  type="submit"
+                  disabled={!newPCName.trim()}
+                  className="bg-amber-500 text-white px-4 py-2.5 rounded-2xl font-black text-xs uppercase disabled:opacity-40 hover:bg-amber-600 transition-colors flex items-center gap-1.5"
+                >
+                  <Plus size={14}/> Adicionar
+                </button>
+              </form>
+
+              {/* Lista */}
+              <div className="space-y-2">
+                {projectClasses
+                  .filter(pc => pc.projectId === selectedClassId)
+                  .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                  .map(pc => (
+                    <div key={pc.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 group">
+                      {editingPCId === pc.id ? (
+                        <>
+                          <input
+                            autoFocus
+                            value={editingPCName}
+                            onChange={e => setEditingPCName(e.target.value)}
+                            className="flex-1 bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            onKeyDown={async e => {
+                              if (e.key === 'Enter') {
+                                if (editingPCName.trim()) await updateProjectClass(pc.id, editingPCName.trim());
+                                setEditingPCId(null);
+                              }
+                              if (e.key === 'Escape') setEditingPCId(null);
+                            }}
+                          />
+                          <button
+                            onClick={async () => {
+                              if (editingPCName.trim()) await updateProjectClass(pc.id, editingPCName.trim());
+                              setEditingPCId(null);
+                            }}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Salvar"
+                          >
+                            <Save size={14}/>
+                          </button>
+                          <button
+                            onClick={() => setEditingPCId(null)}
+                            className="p-1.5 text-slate-400 hover:bg-slate-200 rounded-lg transition-all"
+                            title="Cancelar"
+                          >
+                            <X size={14}/>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-xs font-black text-slate-800 uppercase">{pc.name}</span>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                              onClick={() => { setEditingPCId(pc.id); setEditingPCName(pc.name); }}
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title="Editar"
+                            >
+                              <Pencil size={13}/>
+                            </button>
+                            <button
+                              onClick={() => setConfirmConfig({
+                                title: 'Excluir Turma',
+                                message: `Deseja excluir a turma "${pc.name}"?`,
+                                onConfirm: async () => { await deleteProjectClass(pc.id); setConfirmConfig(null); },
+                              })}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                              title="Excluir"
+                            >
+                              <Trash2 size={13}/>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                {projectClasses.filter(pc => pc.projectId === selectedClassId).length === 0 && (
+                  <p className="text-center text-[9px] font-black text-slate-300 uppercase tracking-widest py-4">
+                    Nenhuma turma cadastrada para este projeto.
+                  </p>
+                )}
+              </div>
+            </section>
+
             <section className="space-y-6 pt-6 border-t border-slate-100">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><CalendarIcon size={14}/> Cronograma da Turma</h4>
               <div className="space-y-4 relative pl-4">

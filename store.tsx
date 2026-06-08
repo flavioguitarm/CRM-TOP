@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ProjectClass } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -109,6 +109,11 @@ interface DataContextType {
   addCSDailyService: (service: CSDailyService) => void;
   updateCSDailyService: (service: CSDailyService) => void;
   deleteCSDailyService: (id: string) => void;
+  // ── Turmas do Projeto ─────────────────────────────────��─────────────────────
+  projectClasses: ProjectClass[];
+  addProjectClass: (projectId: string, name: string) => Promise<void>;
+  updateProjectClass: (id: string, name: string) => Promise<void>;
+  deleteProjectClass: (id: string) => Promise<void>;
   resetDatabase: () => void;
   exportDatabase: () => string;
   importDatabase: (jsonData: string) => void;
@@ -383,6 +388,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [courses, setCourses]           = useState<Course[]>([]);
   const [classes, setClasses]           = useState<ClassRoom[]>([]);
+  const [projectClasses, setProjectClasses] = useState<ProjectClass[]>([]);
   const [funnels, setFunnels]           = useState<Funnel[]>([]);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts]         = useState<Product[]>([]);
@@ -421,6 +427,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (error) { console.error('courses fetch:', error.message); return; }
         setCourses((data ?? []).map(r => ({
           id: r.id,
+          name: r.name,
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: project_classes
+  useEffect(() => {
+    if (!tenantId) { setProjectClasses([]); return; }
+    supabase
+      .from('project_classes')
+      .select('id, project_id, name, created_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at')
+      .then(({ data, error }) => {
+        if (error) { console.error('project_classes fetch:', error.message); return; }
+        setProjectClasses((data ?? []).map(r => ({
+          id: r.id,
+          projectId: r.project_id,
           name: r.name,
           createdAt: r.created_at?.split('T')[0] ?? today,
         })));
@@ -1586,6 +1611,39 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ── CRUD: Turmas do Projeto (project_classes) ──────────────────────────────
+  const addProjectClass = async (projectId: string, name: string) => {
+    if (!tenantId) return;
+    const id = crypto.randomUUID();
+    const newItem: ProjectClass = { id, projectId, name, createdAt: today };
+    setProjectClasses(prev => [...prev, newItem]);
+    const { error } = await supabase.from('project_classes').insert({
+      id, project_id: projectId, name, tenant_id: tenantId,
+    });
+    if (error) {
+      console.error('addProjectClass:', error.message);
+      setProjectClasses(prev => prev.filter(pc => pc.id !== id));
+    }
+  };
+
+  const updateProjectClass = async (id: string, name: string) => {
+    setProjectClasses(prev => prev.map(pc => pc.id === id ? { ...pc, name } : pc));
+    if (!tenantId) return;
+    const { error } = await supabase.from('project_classes')
+      .update({ name })
+      .eq('id', id).eq('tenant_id', tenantId);
+    if (error) console.error('updateProjectClass:', error.message);
+  };
+
+  const deleteProjectClass = async (id: string) => {
+    setProjectClasses(prev => prev.filter(pc => pc.id !== id));
+    if (!tenantId) return;
+    const { error } = await supabase.from('project_classes')
+      .delete()
+      .eq('id', id).eq('tenant_id', tenantId);
+    if (error) console.error('deleteProjectClass:', error.message);
+  };
+
   const addFunnel = (funnel: Funnel) => {
     setFunnels(prev => [...prev, funnel]);
     if (tenantId) {
@@ -2254,6 +2312,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addClassProduct, updateClassProduct, removeClassProduct,
       addCSAction, updateCSAction, addCSActionActivity, deleteCSAction,
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
+      projectClasses, addProjectClass, updateProjectClass, deleteProjectClass,
       resetDatabase, exportDatabase, importDatabase,
       exportAllData, importAllData, resetAllData,
       backupSettings, loadBackupSettings, saveBackupSettings,

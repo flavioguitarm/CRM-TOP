@@ -104,6 +104,13 @@ export interface TimelineEvent {
   completed: boolean;
 }
 
+export interface ProjectClass {
+  id: string;
+  projectId: string; // FK → ClassRoom.id
+  name: string;
+  createdAt: string;
+}
+
 export interface ActivityType {
   id: string;
   name: string;
