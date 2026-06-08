@@ -7,8 +7,10 @@ import {
   Filter, Phone,
   Download, FileSpreadsheet, Check,
   AlertCircle, CheckSquare, Square,
-  RotateCcw, MessageCircle
+  RotateCcw, MessageCircle, RefreshCw
 } from 'lucide-react';
+
+const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
 import { CSDailyService } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -53,9 +55,11 @@ const ServiceModal: React.FC<{
     }
   );
 
+  const [divergenceDismissed, setDivergenceDismissed] = useState(false);
+
   const matchedClient = useMemo(() => {
     if (!formData.clientPhone) return null;
-    return clients.find(c => c.phone.replace(/\D/g, '') === formData.clientPhone?.replace(/\D/g, ''));
+    return clients.find(c => normalizePhone(c.phone) === normalizePhone(formData.clientPhone ?? ''));
   }, [formData.clientPhone, clients]);
 
   // Preenche clientId, nome e turma automaticamente ao encontrar match por telefone
@@ -71,6 +75,17 @@ const ServiceModal: React.FC<{
       setFormData(prev => ({ ...prev, clientId: '', clientNameManual: '' }));
     }
   }, [matchedClient, serviceToEdit]);
+
+  // Divergência: só relevante ao EDITAR um atendimento já vinculado a um cliente
+  const divergence = useMemo(() => {
+    if (!serviceToEdit || !matchedClient || divergenceDismissed) return null;
+    const nameDiffers  = serviceToEdit.clientNameManual &&
+                         serviceToEdit.clientNameManual !== matchedClient.name;
+    const classDiffers = serviceToEdit.classId &&
+                         serviceToEdit.classId !== matchedClient.classId;
+    if (!nameDiffers && !classDiffers) return null;
+    return { nameDiffers, classDiffers };
+  }, [serviceToEdit, matchedClient, divergenceDismissed]);
 
   const clientClass = useMemo(() =>
     matchedClient ? classes.find(cl => cl.id === matchedClient.classId) : null,
@@ -114,6 +129,74 @@ const ServiceModal: React.FC<{
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 bg-white">
+
+          {/* Banner de divergência: dados do atendimento ≠ dados do cliente vinculado */}
+          {divergence && matchedClient && (
+            <div className="bg-amber-50 border border-amber-200 rounded-[1.5rem] p-4 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">
+                      Divergência detectada
+                    </p>
+                    <p className="text-xs font-medium text-amber-700 leading-relaxed">
+                      Os dados deste atendimento diferem do cliente vinculado na base.
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {divergence.nameDiffers && (
+                        <p className="text-[10px] font-bold text-amber-700">
+                          <span className="text-amber-500">Nome no atendimento:</span>{' '}
+                          <span className="line-through opacity-60">{serviceToEdit?.clientNameManual}</span>
+                          {' → '}
+                          <span className="font-black">{matchedClient.name}</span>
+                        </p>
+                      )}
+                      {divergence.classDiffers && (
+                        <p className="text-[10px] font-bold text-amber-700">
+                          <span className="text-amber-500">Turma no cliente:</span>{' '}
+                          <span className="font-black">
+                            {classes.find(c => c.id === matchedClient.classId)?.name ?? 'Sem turma'}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDivergenceDismissed(true)}
+                  className="p-1 text-amber-400 hover:text-amber-700 transition-colors shrink-0"
+                  title="Ignorar"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      clientNameManual: matchedClient.name,
+                      classId: matchedClient.classId || prev.classId,
+                    }));
+                    setDivergenceDismissed(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all"
+                >
+                  <RefreshCw size={12} /> Sincronizar com cliente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDivergenceDismissed(true)}
+                  className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-amber-600 hover:bg-amber-100 transition-all"
+                >
+                  Manter atual
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Bloco 1: Identificação */}
           <div className="space-y-4">

@@ -1211,12 +1211,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     seller_id:       null, // TODO: implementar seller corretamente — forçado null por ora para evitar FK violation
   });
 
+  // ── Helper: normaliza telefone para comparação (apenas dígitos) ──────────────
+  const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+
   const addClient = (client: Client) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const newClient = { ...client, createdAt: client.createdAt || todayStr };
+    const clientPhoneNorm = normalizePhone(client.phone);
 
-    // Varredura retroativa por atendimentos diários CS órfãos (apenas com telefone)
-    const orphans = csDailyServices.filter(s => s.clientPhone === client.phone && !s.clientId);
+    // Varredura retroativa por atendimentos CS órfãos com mesmo telefone (normalizado)
+    const orphans = csDailyServices.filter(s =>
+      normalizePhone(s.clientPhone) === clientPhoneNorm && !s.clientId
+    );
     const orphanActivities: Activity[] = orphans.map(o => ({
         id: `act-retro-${o.id}`,
         type: o.type === 'Ligação' ? 'call' : o.type === 'E-mail' ? 'email' : 'note',
@@ -1226,13 +1232,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (orphans.length > 0) {
         newClient.activities = [...orphanActivities, ...newClient.activities];
-        setCsDailyServices(prev => prev.map(s => s.clientPhone === client.phone ? { ...s, clientId: newClient.id } : s));
+        // Atualiza clientId + clientNameManual + classId (se vazio) nos atendimentos órfãos
+        setCsDailyServices(prev => prev.map(s => {
+          if (normalizePhone(s.clientPhone) !== clientPhoneNorm || s.clientId) return s;
+          return {
+            ...s,
+            clientId:         newClient.id,
+            clientNameManual: newClient.name,
+            classId:          s.classId || newClient.classId || s.classId,
+          };
+        }));
         if (tenantId) {
           supabase.from('cs_daily_services')
-            .update({ client_id: newClient.id })
-            .eq('client_phone', client.phone)
+            .update({
+              client_id:          newClient.id,
+              client_name_manual: newClient.name,
+            })
             .eq('tenant_id', tenantId)
+            .is('client_id', null)
             .then(({ error }) => { if (error) console.error('retroactive csDs link:', error.message); });
+          // Atualiza classId apenas nos órfãos sem turma definida
+          const orphansWithoutClass = orphans.filter(o => !o.classId);
+          if (orphansWithoutClass.length > 0 && newClient.classId) {
+            supabase.from('cs_daily_services')
+              .update({ class_id: newClient.classId })
+              .in('id', orphansWithoutClass.map(o => o.id))
+              .eq('tenant_id', tenantId)
+              .then(({ error }) => { if (error) console.error('retroactive csDs classId:', error.message); });
+          }
         }
     }
 
@@ -1261,6 +1288,44 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateClient = (client: Client) => {
     setClients(prev => prev.map(c => c.id === client.id ? client : c));
+
+    // Propaga nome e turma para todos os atendimentos vinculados a este telefone
+    const clientPhoneNorm = normalizePhone(client.phone);
+    const linked = csDailyServices.filter(s =>
+      normalizePhone(s.clientPhone) === clientPhoneNorm
+    );
+    if (linked.length > 0) {
+      setCsDailyServices(prev => prev.map(s => {
+        if (normalizePhone(s.clientPhone) !== clientPhoneNorm) return s;
+        return {
+          ...s,
+          clientId:         client.id,
+          clientNameManual: client.name,
+          classId:          s.classId || client.classId || '',
+        };
+      }));
+      if (tenantId) {
+        // Atualiza todos os atendimentos com o nome do cliente (cliente tem prioridade)
+        supabase.from('cs_daily_services')
+          .update({
+            client_id:          client.id,
+            client_name_manual: client.name,
+          })
+          .in('id', linked.map(s => s.id))
+          .eq('tenant_id', tenantId)
+          .then(({ error }) => { if (error) console.error('updateClient → csDs link:', error.message); });
+        // Atualiza classId apenas nos que ainda não têm turma definida
+        const linkedWithoutClass = linked.filter(s => !s.classId);
+        if (linkedWithoutClass.length > 0 && client.classId) {
+          supabase.from('cs_daily_services')
+            .update({ class_id: client.classId })
+            .in('id', linkedWithoutClass.map(s => s.id))
+            .eq('tenant_id', tenantId)
+            .then(({ error }) => { if (error) console.error('updateClient → csDs classId:', error.message); });
+        }
+      }
+    }
+
     if (tenantId) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id, tenant_id: _tid, ...payload } = clientPayload(client, tenantId) as any;
