@@ -7,7 +7,7 @@ import {
   Calendar, CheckCircle2, LayoutGrid, FileSpreadsheet, Download, Check,
   Settings, Palette, Save
 } from 'lucide-react';
-import { CSAction, CSActionActivity, DemandType } from '../types';
+import { CSAction, CSActionActivity, DemandType, ChannelType } from '../types';
 import BulkImportModal from '../components/BulkImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { usePermissions } from '../src/hooks/usePermissions';
@@ -216,9 +216,22 @@ const CSActionModal: React.FC<{
             </div>
           </div>
 
-          <div className="space-y-1 pb-10">
+          <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">12. Canal</label>
             <input placeholder="Ex: WhatsApp, Instagram, Presencial..." className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm" value={formData.channel} onChange={e => setFormData({...formData, channel: e.target.value})} />
+          </div>
+
+          <div className="space-y-1 pb-10">
+            <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest">13. Custo (R$)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0,00"
+              className="w-full bg-rose-50 border border-rose-100 text-rose-900 rounded-2xl px-6 py-4 text-sm font-black shadow-sm focus:ring-2 focus:ring-rose-400 outline-none"
+              value={formData.cost ?? 0}
+              onChange={e => setFormData({...formData, cost: parseFloat(e.target.value) || 0})}
+            />
           </div>
 
           <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all sticky bottom-0">
@@ -379,11 +392,114 @@ const DemandTypesConfig: React.FC = () => {
   );
 };
 
+// ── View: Configurar Tipos de Canal ──────────────────────────────────────────
+const ChannelTypesConfig: React.FC = () => {
+  const { channelTypes, addChannelType, updateChannelType, deleteChannelType } = useData();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#94a3b8');
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState('#f59e0b');
+  const [isAdding, setIsAdding] = useState(false);
+
+  const startEdit = (ct: ChannelType) => { setEditingId(ct.id); setEditName(ct.name); setEditColor(ct.color); };
+  const saveEdit = async () => {
+    if (!editingId || !editName.trim()) return;
+    await updateChannelType({ id: editingId, name: editName.trim(), color: editColor, createdAt: '' });
+    setEditingId(null);
+  };
+  const handleAdd = async () => {
+    if (!newName.trim()) return;
+    await addChannelType({ name: newName.trim(), color: newColor });
+    setNewName(''); setNewColor('#f59e0b'); setIsAdding(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Tipos de Canal</h2>
+          <p className="text-slate-400 text-xs mt-1">Canais utilizados nas ações CS (WhatsApp, Instagram, etc.).</p>
+        </div>
+        <button onClick={() => setIsAdding(true)} className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 flex items-center gap-2 hover:bg-amber-600 transition-all">
+          <Plus size={16} /> Novo Canal
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        {isAdding && (
+          <div className="p-6 border-b border-slate-100 bg-amber-50/50 flex items-center gap-4 animate-in slide-in-from-top-2">
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do canal..." autoFocus className="flex-1 bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-400 outline-none" />
+            <div className="flex items-center gap-3">
+              <label className="text-[9px] font-black text-slate-400 uppercase">Cor</label>
+              <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="w-10 h-10 rounded-xl cursor-pointer border border-slate-200 p-0.5" />
+            </div>
+            <button onClick={handleAdd} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase hover:bg-slate-800 transition-all flex items-center gap-2"><Check size={16}/> Salvar</button>
+            <button onClick={() => { setIsAdding(false); setNewName(''); }} className="p-3 text-slate-400 hover:bg-slate-100 rounded-xl transition-all"><X size={18}/></button>
+          </div>
+        )}
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100 bg-slate-50">
+              <th className="px-8 py-4">Cor</th>
+              <th className="px-8 py-4">Nome do Canal</th>
+              <th className="px-8 py-4 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {channelTypes.map(ct => (
+              <tr key={ct.id} className="group hover:bg-slate-50 transition-colors">
+                <td className="px-8 py-4">
+                  {editingId === ct.id
+                    ? <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-9 h-9 rounded-xl cursor-pointer border border-slate-200 p-0.5" />
+                    : <span className="w-7 h-7 rounded-full inline-block border-2 border-white shadow-sm" style={{ backgroundColor: ct.color }} />
+                  }
+                </td>
+                <td className="px-8 py-4">
+                  {editingId === ct.id
+                    ? <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }} className="bg-white border border-amber-300 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-amber-400 outline-none w-full" />
+                    : <span className="text-sm font-bold text-slate-900 uppercase">{ct.name}</span>
+                  }
+                </td>
+                <td className="px-8 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                    {editingId === ct.id ? (
+                      <>
+                        <button onClick={saveEdit} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"><Save size={16}/></button>
+                        <button onClick={() => setEditingId(null)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-all"><X size={16}/></button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(ct)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={16}/></button>
+                        <button onClick={() => deleteChannelType(ct.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16}/></button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {channelTypes.length === 0 && !isAdding && (
+              <tr>
+                <td colSpan={3} className="py-20 text-center">
+                  <div className="flex flex-col items-center gap-3 opacity-20">
+                    <Palette size={48} />
+                    <p className="font-black uppercase text-xs tracking-widest">Nenhum canal cadastrado</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ── View principal: Painel de Ações ───────────────────────────────────────────
 const CSActionsView: React.FC = () => {
   const { csActions, classes, moveToTrash, addCSActionActivity, addCSAction, currentUser, users, demandTypes } = useData();
   const perms = usePermissions('acoesCs');
-  const [activeTab, setActiveTab] = useState<'painel' | 'tipos'>('painel');
+  const [activeTab, setActiveTab] = useState<'painel' | 'canais' | 'tipos'>('painel');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -513,17 +629,26 @@ const CSActionsView: React.FC = () => {
               onClick={() => setActiveTab('painel')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'painel' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <LayoutGrid size={14} /> Painel de Ações
+              <LayoutGrid size={14} /> Ações
+            </button>
+            <button
+              onClick={() => setActiveTab('canais')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'canais' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Palette size={14} /> Tipo de Canal
             </button>
             <button
               onClick={() => setActiveTab('tipos')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'tipos' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Settings size={14} /> Configurar Tipos de Demanda
+              <Settings size={14} /> Tipo de Demanda
             </button>
           </div>
         </div>
       </div>
+
+      {/* Tab: Tipo de Canal */}
+      {activeTab === 'canais' && <ChannelTypesConfig />}
 
       {/* Tab: Configurar Tipos de Demanda */}
       {activeTab === 'tipos' && <DemandTypesConfig />}
@@ -643,16 +768,44 @@ const CSActionsView: React.FC = () => {
               </div>
 
               <div className="p-8 space-y-10">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Engajamento</p>
-                        <p className="text-2xl font-black text-amber-400">{selectedAction.totalReached} / {selectedAction.totalResponses}</p>
-                    </div>
-                    <div className="bg-emerald-600 p-6 rounded-[2rem] text-white">
-                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Faturamento</p>
-                        <p className="text-2xl font-black">R$ {selectedAction.revenueResult.toLocaleString()}</p>
-                    </div>
-                </div>
+                {/* ── Cards de métricas ─────────────────────────────────── */}
+                {(() => {
+                  const cost = selectedAction.cost ?? 0;
+                  const reached = selectedAction.totalReached ?? 0;
+                  const cac = cost > 0 && reached > 0 ? cost / reached : null;
+                  const roi = cost > 0 ? selectedAction.revenueResult - cost : null;
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-rose-600 p-5 rounded-[2rem] text-white">
+                          <p className="text-[9px] font-black text-rose-200 uppercase tracking-widest mb-1">Custo Total</p>
+                          <p className="text-xl font-black">R$ {cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="bg-slate-900 p-5 rounded-[2rem] text-white">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Atingidos / Respostas</p>
+                          <p className="text-xl font-black text-amber-400">{reached} <span className="text-slate-500 text-sm">/ {selectedAction.totalResponses}</span></p>
+                        </div>
+                        <div className="bg-emerald-600 p-5 rounded-[2rem] text-white">
+                          <p className="text-[9px] font-black text-emerald-200 uppercase tracking-widest mb-1">Faturamento</p>
+                          <p className="text-xl font-black">R$ {selectedAction.revenueResult.toLocaleString()}</p>
+                          {roi !== null && (
+                            <p className="text-[9px] font-black mt-1 text-emerald-100">ROI líquido: R$ {roi.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          )}
+                        </div>
+                        <div className={`p-5 rounded-[2rem] text-white ${cac !== null ? 'bg-purple-600' : 'bg-slate-700'}`}>
+                          <p className="text-[9px] font-black text-purple-200 uppercase tracking-widest mb-1">CAC</p>
+                          {cac !== null
+                            ? <>
+                                <p className="text-xl font-black">R$ {cac.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                <p className="text-[8px] text-purple-200 mt-1 uppercase">Custo / Atingidos</p>
+                              </>
+                            : <p className="text-sm font-bold text-slate-400">Sem custo informado</p>
+                          }
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Info do tipo de demanda */}
                 <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">

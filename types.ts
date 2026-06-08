@@ -150,6 +150,13 @@ export interface DemandType {
   createdAt: string;
 }
 
+export interface ChannelType {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
 export interface CSAction {
   id: string;
   classId: string;
@@ -162,6 +169,7 @@ export interface CSAction {
   volumeSold: number;
   revenueResult: number;
   channel: string;
+  cost?: number;
   activities: CSActionActivity[];
   createdAt: string;
   responsibleUserId?: string;

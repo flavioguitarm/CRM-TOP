@@ -7,7 +7,7 @@ import { LogOut, ChevronDown, User, Shield, Bell, Clock, Calendar, Zap, ListTodo
 import { Link, useNavigate } from 'react-router-dom';
 
 const Header: React.FC = () => {
-  const { currentUser, sidebarCollapsed, tasks, events, classes } = useData();
+  const { currentUser, sidebarCollapsed, tasks, events, csActions } = useData();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -66,7 +66,7 @@ const Header: React.FC = () => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Filtrar Tarefas pendentes de hoje em diante
+    // Tarefas pendentes de hoje em diante
     const pendingTasks = tasks
       .filter(t => !t.completed && t.date >= todayStr)
       .map(t => ({
@@ -75,26 +75,40 @@ const Header: React.FC = () => {
         date: t.date,
         time: t.time,
         type: 'TASK' as const,
-        dateTime: new Date(`${t.date}T${t.time}`)
+        link: '/clientes',
+        dateTime: new Date(`${t.date}T${t.time || '00:00'}`)
       }));
 
-    // Filtrar Eventos não realizados
+    // Eventos não realizados
     const pendingEvents = events
       .filter(e => e.status !== 'Realizado' && e.startDateTime >= now.toISOString())
       .map(e => ({
         id: e.id,
         title: e.name,
         date: e.startDateTime.split('T')[0],
-        time: e.startDateTime.split('T')[1].substring(0, 5),
+        time: e.startDateTime.split('T')[1]?.substring(0, 5) ?? '00:00',
         type: 'EVENT' as const,
+        link: '/admin/eventos',
         dateTime: new Date(e.startDateTime)
       }));
 
-    // Combinar e ordenar por proximidade (mais próximo primeiro)
-    return [...pendingTasks, ...pendingEvents]
+    // Ações CS com endDate >= hoje
+    const pendingActions = csActions
+      .filter(a => a.endDate >= todayStr && a.status !== 'FEITO')
+      .map(a => ({
+        id: a.id,
+        title: `${a.type || 'Ação CS'} · ${a.status}`,
+        date: a.startDate,
+        time: '00:00',
+        type: 'ACTION' as const,
+        link: '/acoes-cs',
+        dateTime: new Date(`${a.startDate}T00:00`)
+      }));
+
+    return [...pendingTasks, ...pendingEvents, ...pendingActions]
       .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
-      .slice(0, 5); // Apenas um resumo das 5 mais próximas
-  }, [tasks, events]);
+      .slice(0, 10);
+  }, [tasks, events, csActions]);
 
   const hasUrgent = upcomingActivities.some(a => a.date === new Date().toISOString().split('T')[0]);
 
@@ -126,7 +140,7 @@ const Header: React.FC = () => {
               <div className="p-5 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Atividades Próximas</h4>
-                  <span className="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">{upcomingActivities.length} Pendentes</span>
+                  <span className="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">{upcomingActivities.length} próximas</span>
                 </div>
               </div>
               
@@ -135,27 +149,38 @@ const Header: React.FC = () => {
                   <div className="divide-y divide-slate-50">
                     {upcomingActivities.map((act) => {
                       const isToday = act.date === new Date().toISOString().split('T')[0];
+                      const iconBg = act.type === 'TASK' ? 'bg-rose-50 text-rose-500' : act.type === 'ACTION' ? 'bg-purple-50 text-purple-600' : 'bg-amber-50 text-amber-600';
+                      const icon = act.type === 'TASK' ? <ListTodo size={14} /> : act.type === 'ACTION' ? <Zap size={14} /> : <Calendar size={14} />;
                       return (
-                        <div key={act.id} className="p-4 hover:bg-slate-50 transition-colors group">
+                        <Link
+                          key={act.id}
+                          to={act.link}
+                          onClick={() => setIsNotifyOpen(false)}
+                          className="block p-4 hover:bg-slate-50 transition-colors group"
+                        >
                           <div className="flex items-start gap-3">
-                            <div className={`mt-1 p-2 rounded-lg ${act.type === 'TASK' ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-600'}`}>
-                              {act.type === 'TASK' ? <ListTodo size={14} /> : <Calendar size={14} />}
-                            </div>
+                            <div className={`mt-1 p-2 rounded-lg flex-shrink-0 ${iconBg}`}>{icon}</div>
                             <div className="flex-1 min-w-0">
                               <p className={`text-xs font-black uppercase truncate tracking-tight ${isToday ? 'text-slate-900' : 'text-slate-600'}`}>
                                 {act.title}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${isToday ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                  {isToday ? 'Hoje' : new Date(act.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                                  {isToday ? 'Hoje' : new Date(act.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                                 </span>
-                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                  <Clock size={10} /> {act.time}
+                                {act.time !== '00:00' && (
+                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                    <Clock size={10} /> {act.time}
+                                  </span>
+                                )}
+                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${act.type === 'TASK' ? 'bg-rose-100 text-rose-600' : act.type === 'ACTION' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'}`}>
+                                  {act.type === 'TASK' ? 'Tarefa' : act.type === 'ACTION' ? 'Ação CS' : 'Evento'}
                                 </span>
                               </div>
                             </div>
+                            <ChevronRight size={12} className="text-slate-300 group-hover:text-slate-500 mt-1 flex-shrink-0" />
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

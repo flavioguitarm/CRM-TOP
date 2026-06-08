@@ -16,7 +16,8 @@ import { usePermissions } from '../src/hooks/usePermissions';
 import * as XLSX from 'xlsx';
 
 // Campos canal contatado e canal de atendimento (opções fixas)
-const CANAL_CONTATADO_OPTIONS = ['WhatsApp', 'Ligação', 'Instagram', 'Facebook', 'E-mail', 'Presencial', 'Outro'];
+// Opções fixas de canal contatado (futuramente virá de cadastro)
+const CANAL_CONTATADO_OPTIONS = ['API', 'CS1', 'CS2'];
 const CANAL_ATENDIMENTO_OPTIONS = ['WhatsApp', 'Ligação', 'E-mail', 'Presencial', 'Instagram', 'Outro'];
 
 // ── Modal de criação/edição de Atendimento ────────────────────────────────────

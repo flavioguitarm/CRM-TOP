@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ProjectClass } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ChannelType, ProjectClass } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -77,6 +77,10 @@ interface DataContextType {
   addDemandType: (data: Omit<DemandType, 'id' | 'createdAt'>) => Promise<void>;
   updateDemandType: (demandType: DemandType) => Promise<void>;
   deleteDemandType: (id: string) => Promise<void>;
+  channelTypes: ChannelType[];
+  addChannelType: (data: Omit<ChannelType, 'id' | 'createdAt'>) => Promise<void>;
+  updateChannelType: (ct: ChannelType) => Promise<void>;
+  deleteChannelType: (id: string) => Promise<void>;
   addClass: (newClass: ClassRoom) => Promise<void>;
   updateClass: (updatedClass: ClassRoom) => Promise<void>;
   deleteClass: (classId: string) => void;
@@ -249,6 +253,7 @@ function mapCSActionRow(row: any): CSAction {
     volumeSold:       row.volume_sold ?? 0,
     revenueResult:    row.revenue_result ?? 0,
     channel:          row.channel ?? '',
+    cost:             row.cost ?? 0,
     responsibleUserId: row.responsible_user_id ?? undefined,
     createdAt:        row.created_at?.split('T')[0] ?? '',
     activities:       (row.cs_action_activities ?? []).map((a: any) => ({
@@ -394,6 +399,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [products, setProducts]         = useState<Product[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [demandTypes, setDemandTypes]     = useState<DemandType[]>([]);
+  const [channelTypes, setChannelTypes]   = useState<ChannelType[]>([]);
 
   // Fetch: institutions
   useEffect(() => {
@@ -600,6 +606,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .then(({ data, error }) => {
         if (error) { console.error('demandTypes fetch:', error.message); return; }
         setDemandTypes((data ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          color:     r.color ?? '#94a3b8',
+          createdAt: r.created_at?.split('T')[0] ?? today,
+        })));
+      });
+  }, [tenantId]);
+
+  // Fetch: channelTypes
+  useEffect(() => {
+    if (!tenantId) { setChannelTypes([]); return; }
+    supabase
+      .from('channel_types')
+      .select('id, name, color, created_at')
+      .eq('tenant_id', tenantId)
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) { console.error('channelTypes fetch:', error.message); return; }
+        setChannelTypes((data ?? []).map(r => ({
           id:        r.id,
           name:      r.name,
           color:     r.color ?? '#94a3b8',
@@ -1475,6 +1500,35 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDemandTypes(prev => prev.filter(d => d.id !== id));
   };
 
+  // ── channelTypes ─────────────────────────────────────────────────────────────
+  const addChannelType = async (data: Omit<ChannelType, 'id' | 'createdAt'>) => {
+    if (!tenantId) return;
+    const { data: row, error } = await supabase
+      .from('channel_types')
+      .insert({ tenant_id: tenantId, name: data.name, color: data.color ?? '#94a3b8' })
+      .select('id, name, color, created_at')
+      .single();
+    if (error) { console.error('addChannelType:', error.message); return; }
+    setChannelTypes(prev => [...prev, { id: row.id, name: row.name, color: row.color ?? '#94a3b8', createdAt: row.created_at?.split('T')[0] ?? today }]);
+  };
+
+  const updateChannelType = async (ct: ChannelType) => {
+    if (!tenantId) return;
+    const { error } = await supabase
+      .from('channel_types')
+      .update({ name: ct.name, color: ct.color })
+      .eq('id', ct.id).eq('tenant_id', tenantId);
+    if (error) { console.error('updateChannelType:', error.message); return; }
+    setChannelTypes(prev => prev.map(c => c.id === ct.id ? ct : c));
+  };
+
+  const deleteChannelType = async (id: string) => {
+    if (!tenantId) return;
+    const { error } = await supabase.from('channel_types').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) { console.error('deleteChannelType:', error.message); return; }
+    setChannelTypes(prev => prev.filter(c => c.id !== id));
+  };
+
   // ── classes ─────────────────────────────────────────────────────────────────
 
   const addClass = async (newClass: ClassRoom) => {
@@ -1888,6 +1942,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         volume_sold:         action.volumeSold       ?? 0,
         revenue_result:      action.revenueResult    ?? 0,
         channel:             action.channel          || null,
+        cost:                action.cost             ?? 0,
         responsible_user_id: action.responsibleUserId || null,
       }).then(({ error }) => { if (error) console.error('addCSAction:', error.message); });
     }
@@ -1907,6 +1962,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         volume_sold:         action.volumeSold       ?? 0,
         revenue_result:      action.revenueResult    ?? 0,
         channel:             action.channel          || null,
+        cost:                action.cost             ?? 0,
         responsible_user_id: action.responsibleUserId || null,
       }).eq('id', action.id).eq('tenant_id', tenantId)
         .then(({ error }) => { if (error) console.error('updateCSAction:', error.message); });
@@ -2305,6 +2361,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addProduct, updateProduct, deleteProduct,
       addActivityType, updateActivityType, deleteActivityType,
       addDemandType, updateDemandType, deleteDemandType,
+      channelTypes, addChannelType, updateChannelType, deleteChannelType,
       addClass, updateClass, deleteClass, addEvent, updateEvent, addEventActivity, deleteEvent,
       addTask, updateTask, toggleTask, deleteTask,
       canDeleteEntity, updateFunnel, addFunnel, deleteFunnel, isStageOccupied,
