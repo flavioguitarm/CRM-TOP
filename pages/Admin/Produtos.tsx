@@ -217,7 +217,7 @@ const ProdutosAdmin: React.FC = () => {
       </div>
 
       <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
-        <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedProdId && activeTab === 'products' ? 'w-1/2' : 'w-full'}`}>
+        <div className="flex-1 min-w-0 flex flex-col gap-6 overflow-hidden">
           {activeTab === 'products' ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto pb-10">
                {sortedProducts.map(prod => {
@@ -225,7 +225,7 @@ const ProdutosAdmin: React.FC = () => {
                  return (
                    <div
                      key={prod.id}
-                     onClick={() => setSelectedProdId(prod.id)}
+                     onClick={() => setSelectedProdId(prev => prev === prod.id ? null : prod.id)}
                      className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedProdId === prod.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedProdIds.has(prod.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}
                    >
                      <button onClick={(e) => toggleSelectProd(prod.id, e)} className={`absolute top-3 left-3 p-1 rounded-lg transition-all z-10 ${selectedProdIds.has(prod.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
@@ -309,14 +309,15 @@ const ProdutosAdmin: React.FC = () => {
         </div>
 
         {selectedProdId && selectedProd && activeTab === 'products' && (
-          <div className="w-[520px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-                <Package size={28} className="text-amber-500" /> Perfil do Produto
+          <div className="w-[480px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10 gap-3">
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-tighter flex items-center gap-2 min-w-0 truncate">
+                <Package size={20} className="text-amber-500 flex-shrink-0" /> Perfil do Produto
               </h2>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setItemToEdit(selectedProd); setProdModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>
-                <button onClick={() => setSelectedProdId(null)} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button onClick={() => { setItemToEdit(selectedProd); setProdModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all" title="Editar"><Edit3 size={18} /></button>
+                <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover "${selectedProd.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('product', [selectedProd.id]); setSelectedProdId(null); setConfirmConfig(null); } })} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="Excluir"><Trash2 size={18} /></button>
+                <button onClick={() => setSelectedProdId(null)} className="p-2.5 text-slate-400 hover:text-slate-700 rounded-xl transition-all"><X size={22} /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-12 space-y-12 flex flex-col items-center text-center">

@@ -356,7 +356,7 @@ const EventosAdmin: React.FC = () => {
       </div>
 
       <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
-        <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedEvtId && activeTab === 'events' ? 'w-1/2' : 'w-full'}`}>
+        <div className="flex-1 min-w-0 flex flex-col gap-6 overflow-hidden">
           {activeTab === 'events' ? (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto pb-10">
                {events.map(evt => {
@@ -364,7 +364,7 @@ const EventosAdmin: React.FC = () => {
                  return (
                    <div
                      key={evt.id}
-                     onClick={() => setSelectedEvtId(evt.id)}
+                     onClick={() => setSelectedEvtId(prev => prev === evt.id ? null : evt.id)}
                      className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all bg-white relative group ${selectedEvtId === evt.id ? 'border-amber-500 shadow-2xl scale-[1.02]' : selectedEvtIds.has(evt.id) ? 'border-rose-400 shadow-lg' : 'border-white hover:border-slate-200 shadow-sm'}`}
                    >
                      <button onClick={(e) => toggleSelectEvt(evt.id, e)} className={`absolute top-3 left-3 p-1 rounded-lg transition-all z-10 ${selectedEvtIds.has(evt.id) ? 'text-rose-500' : 'text-slate-200 opacity-0 group-hover:opacity-100'}`}>
@@ -449,14 +449,15 @@ const EventosAdmin: React.FC = () => {
         </div>
 
         {selectedEvtId && selectedEvt && activeTab === 'events' && (
-          <div className="w-[520px] bg-white border-l border-slate-200 flex flex-col h-full animate-in slide-in-from-right duration-500 shadow-2xl">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-                <Calendar size={28} className="text-amber-500" /> Perfil do Evento
+          <div className="w-[520px] flex-shrink-0 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10 gap-3">
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-tighter flex items-center gap-2 min-w-0 truncate">
+                <Calendar size={20} className="text-amber-500 flex-shrink-0" /> {selectedEvt.name}
               </h2>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setItemToEdit(selectedEvt); setModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"><Edit3 size={24} /></button>
-                <button onClick={handleCloseProfile} className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl transition-all"><X size={28} /></button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button onClick={() => { setItemToEdit(selectedEvt); setModalOpen(true); }} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all" title="Editar"><Edit3 size={18} /></button>
+                <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover o evento "${selectedEvt.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('event', [selectedEvt.id]); handleCloseProfile(); setConfirmConfig(null); } })} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="Excluir"><Trash2 size={18} /></button>
+                <button onClick={handleCloseProfile} className="p-2.5 text-slate-400 hover:text-slate-700 rounded-xl transition-all"><X size={22} /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-10">
@@ -539,9 +540,6 @@ const EventosAdmin: React.FC = () => {
                   </div>
                </section>
 
-              <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: `Mover o evento "${selectedEvt.name}" para a Lixeira?`, onConfirm: () => { moveToTrash('event', [selectedEvt.id]); handleCloseProfile(); setConfirmConfig(null); } })} className="w-full py-4 border-2 border-rose-100 text-rose-500 rounded-2xl font-black uppercase tracking-widest hover:bg-rose-50 transition-all flex items-center justify-center gap-2">
-                <Trash2 size={16}/> Excluir Registro
-              </button>
             </div>
           </div>
         )}

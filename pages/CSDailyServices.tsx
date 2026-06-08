@@ -703,6 +703,11 @@ const CSDailyServicesView: React.FC = () => {
                     <Edit3 size={16}/>
                   </button>
                 )}
+                {perms.canDelete && (
+                  <button onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este atendimento para a Lixeira?', onConfirm: () => { moveToTrash('csDailyService', [svc.id]); setSelectedService(null); setConfirmConfig(null); } })} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="Excluir">
+                    <Trash2 size={16}/>
+                  </button>
+                )}
                 <button onClick={() => setSelectedService(null)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all">
                   <X size={16}/>
                 </button>

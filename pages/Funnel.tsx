@@ -1,13 +1,13 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../store';
-import { 
-  Search, Plus, ArrowRightLeft, Mail, Phone, X, Check, 
-  GraduationCap, Building2, Layers, Eye, User, ChevronDown, 
+import {
+  Search, Plus, ArrowRightLeft, Mail, Phone, X, Check,
+  GraduationCap, Building2, Layers, Eye, User, ChevronDown,
   UserPlus, Users, AlertCircle, SearchCode, Calendar, Tag, Info,
   CheckCircle2, XCircle, TrendingUp, AlertTriangle, MessageSquare,
   Target, ListTodo, Clock, Trash2, CheckSquare, Square, Filter,
-  MousePointer2, Move, CreditCard, BookOpen, MapPin, Hash
+  MousePointer2, Move, CreditCard, BookOpen, MapPin, Hash, Edit3
 } from 'lucide-react';
 import { Client, Activity, Task, Campus, FunnelStage } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
@@ -556,7 +556,7 @@ const FunnelView: React.FC = () => {
                         key={client.id} 
                         draggable={perms.canEdit}
                         onDragStart={(e) => onDragStart(e, client.id)}
-                        onClick={() => setSelectedClientId(client.id)}
+                        onClick={() => setSelectedClientId(prev => prev === client.id ? null : client.id)}
                         className={`bg-white p-6 rounded-[2rem] border-2 transition-all cursor-grab active:cursor-grabbing relative group ${isChecked ? 'border-amber-500 shadow-xl scale-[0.98]' : 'border-white hover:border-amber-300 shadow-sm'}`}
                       >
                          <div className="flex items-start justify-between mb-3">
@@ -614,14 +614,23 @@ const FunnelView: React.FC = () => {
       {isNewLeadModalOpen && <NewLeadModal funnelId={selectedFunnelId} onClose={() => setIsNewLeadModalOpen(false)} />}
 
       {selectedClientId && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-end" onClick={() => setSelectedClientId(null)}>
-          <div className="h-full w-full max-w-lg bg-white shadow-2xl animate-in slide-in-from-right duration-500 flex flex-col" onClick={e => e.stopPropagation()}>
-             <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10 shadow-sm">
-                <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Perfil da Negociação</h2>
-                <button onClick={() => setSelectedClientId(null)} className="p-2 text-slate-400 hover:text-slate-900 transition-all"><X size={32}/></button>
-             </div>
-             <div className="flex-1 overflow-y-auto"><ClientProfileView clientId={selectedClientId} /></div>
+        <div className="fixed right-6 top-24 bottom-6 z-[100] w-[480px] bg-white rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10 gap-3">
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-tighter truncate min-w-0">Perfil da Negociação</h2>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {perms.canDelete && (
+                <button
+                  onClick={() => setConfirmConfig({ title: 'Mover para Lixeira', message: 'Deseja mover este lead para a Lixeira?', onConfirm: () => { moveToTrash('client', [selectedClientId]); setSelectedClientId(null); setConfirmConfig(null); } })}
+                  className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                  title="Excluir"
+                >
+                  <Trash2 size={18}/>
+                </button>
+              )}
+              <button onClick={() => setSelectedClientId(null)} className="p-2.5 text-slate-400 hover:text-slate-700 rounded-xl transition-all"><X size={22}/></button>
+            </div>
           </div>
+          <div className="flex-1 overflow-y-auto"><ClientProfileView clientId={selectedClientId} /></div>
         </div>
       )}
 

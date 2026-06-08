@@ -662,7 +662,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .select(`
         id, class_id, type, start_date, end_date, status,
         total_reached, total_responses, volume_sold, revenue_result,
-        channel, responsible_user_id, created_at,
+        channel, cost, responsible_user_id, created_at,
         cs_action_activities(id, user_name, description, timestamp)
       `)
       .eq('tenant_id', tenantId)
@@ -1985,23 +1985,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteCSAction = (id: string) => moveToTrash('csAction', [id]);
 
-  const addCSDailyService = (service: CSDailyService) => {
+  const addCSDailyService = async (service: CSDailyService) => {
     setCsDailyServices(prev => [service, ...prev]);
     if (tenantId) {
-      supabase.from('cs_daily_services').insert({
+      // Valida FKs contra estado local — evita constraint violation se ID não existir na tabela referenciada
+      const validUserId      = users.find(u => u.id === service.responsibleUserId)?.id ?? null;
+      const validClientId    = clients.find(c => c.id === service.clientId)?.id ?? null;
+      const validClassId     = classes.find(c => c.id === service.classId)?.id ?? null;
+      const validDemandTypeId = demandTypes.find(d => d.id === service.demandTypeId)?.id ?? null;
+
+      const { error } = await supabase.from('cs_daily_services').insert({
         id:                  service.id,
         tenant_id:           tenantId,
-        client_id:           service.clientId          || null,
+        client_id:           validClientId,
         client_phone:        service.clientPhone,
         client_name_manual:  service.clientNameManual  || null,
         date:                service.date,
         type:                service.type,
         summary:             service.summary,
         status:              service.status,
-        responsible_user_id: service.responsibleUserId || null,
-        class_id:            service.classId           || null,
+        responsible_user_id: validUserId,
+        class_id:            validClassId,
         canal_contatado:     service.canalContatado     || null,
-        demand_type_id:      service.demandTypeId       || null,
+        demand_type_id:      validDemandTypeId,
         resolucao:           service.resolucao          || null,
         repasse:             service.repasse            ?? null,
         repasse_setor:       service.repasseSetor       || null,
@@ -2010,7 +2016,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         retorno:             service.retorno            || null,
         remarketing:         service.remarketing        ?? null,
         objecao:             service.objecao            || null,
-      }).then(({ error }) => { if (error) console.error('addCSDailyService:', error.message); });
+      });
+      if (error) {
+        console.error('addCSDailyService:', error.message, '| tenant_id usado:', tenantId);
+        // Rollback optimistic update — insert rejeitado pelo Supabase (ex: RLS)
+        setCsDailyServices(prev => prev.filter(s => s.id !== service.id));
+        alert(`Erro ao salvar atendimento: ${error.message}`);
+        return;
+      }
     }
     if (service.clientId) {
       addClientActivity(service.clientId, {
@@ -2025,18 +2038,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateCSDailyService = (service: CSDailyService) => {
     setCsDailyServices(prev => prev.map(s => s.id === service.id ? service : s));
     if (tenantId) {
+      const validUserId       = users.find(u => u.id === service.responsibleUserId)?.id ?? null;
+      const validClientId     = clients.find(c => c.id === service.clientId)?.id ?? null;
+      const validClassId      = classes.find(c => c.id === service.classId)?.id ?? null;
+      const validDemandTypeId = demandTypes.find(d => d.id === service.demandTypeId)?.id ?? null;
       supabase.from('cs_daily_services').update({
-        client_id:           service.clientId          || null,
+        client_id:           validClientId,
         client_phone:        service.clientPhone,
         client_name_manual:  service.clientNameManual  || null,
         date:                service.date,
         type:                service.type,
         summary:             service.summary,
         status:              service.status,
-        responsible_user_id: service.responsibleUserId || null,
-        class_id:            service.classId           || null,
+        responsible_user_id: validUserId,
+        class_id:            validClassId,
         canal_contatado:     service.canalContatado     || null,
-        demand_type_id:      service.demandTypeId       || null,
+        demand_type_id:      validDemandTypeId,
         resolucao:           service.resolucao          || null,
         repasse:             service.repasse            ?? null,
         repasse_setor:       service.repasseSetor       || null,
