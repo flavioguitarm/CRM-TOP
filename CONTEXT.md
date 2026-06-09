@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-08 (Sessão 17 — concluída)
+> Atualizado em: 2026-06-09 (Sessão 18 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1267,28 +1267,143 @@ gcloud run deploy crm-top-formaturas `
 
 ---
 
-## 🗺️ Próximos passos (Sessão 18+)
+## ✅ Sessão 18 — ClientImportModal Reescrito (2026-06-09)
 
-### 1. ~~Script `deploy.ps1`~~ ✅ Concluído na Sessão 16
-### 2. ~~Bug: Importação em massa não persiste após reload~~ ✅ Corrigido na Sessão 16
-### 3. ~~`ClientImportModal` — Etapas 1, 2 e 3~~ ✅ Concluído na Sessão 17
+### 🔄 `components/ClientImportModal.tsx` — Reescrita Completa
 
-### 4. `ClientImportModal` — Etapas 4 e 5 (Parte 2) ⬅ próxima tarefa
-- **Etapa 4 — Funil:** seletor de funil + etapa (todos os clientes importados entram no mesmo funil inicial); padrão = primeiro funil + primeira etapa do banco
-- **Etapa 5 — Preview e confirmação:** contagem total × ignorados (sem projeto vinculado); agrupamento por projeto com lista de clientes; seletor ignore/overwrite; botão "Confirmar importação de N clientes" → chama `handleBulkImport` com dados limpos (classId, institutionId, funnelId, stageId já resolvidos como UUIDs reais; datas convertidas por `excelDateToISO`)
+O componente foi reescrito do zero com a estrutura correta e definitiva, substituindo completamente as versões parciais das Sessões 17 e início da 18.
 
-### 5. Padronização dos painéis de detalhes
-- Auditar todos os módulos e garantir que o padrão visual oficial (obs. #17 do CONTEXT.md) está consistente
+#### Fluxo — 4 etapas (dinâmico: 3 quando Projetos é pulado)
 
-### 6. Responsividade mobile
+| Etapa | ID | Condição de exibição |
+|-------|-----|----------------------|
+| 1 — Upload | `upload` | sempre |
+| 2 — Colunas | `mapping` | sempre |
+| 3 — Projetos | `projects` | apenas se `columnMap.projectRaw !== ''` |
+| 4 — Confirmar | `preview` | sempre |
+
+**Skip automático de Etapa 3:** quando `directBinds.classId !== ''` e `columnMap.projectRaw === ''`, o stepper exibe apenas 3 etapas e avança direto de Colunas para Confirmar.
+
+---
+
+#### Tipos definitivos
+
+```typescript
+type ColumnMap = {
+  projectRaw: string; // coluna que aciona Etapa 3
+  name:       string; // obrigatório
+  phone:      string;
+  email:      string;
+  cpf:        string;
+  birthDate:  string;
+  gender:     string;
+  tags:       string;
+  campus:     string; // nome do campus (string, não UUID)
+  shift:      string;
+  courseRaw:  string; // nome/ID do curso (fallback)
+};
+
+type DirectBinds = {
+  classId:       string; // UUID — selecionado pelo usuário
+  institutionId: string; // UUID — preenchido automático (sem widget próprio)
+  campus:        string; // campus.name — string, não UUID
+  courseId:      string; // UUID — filtrado por classId
+};
+```
+
+**Campos removidos vs versão anterior:**
+- `institutionRaw` removido — Instituição não é campo mapeável; é derivada do projeto
+- `DirectBinds.institutionId` deixou de ter widget próprio (ainda existe no tipo para montar o payload)
+
+---
+
+#### Seções de campos — Etapa 2
+
+| Seção | Accent | Campos |
+|-------|--------|--------|
+| Identificação | blue | `name*`, `phone`, `email`, `cpf`, `birthDate`, `gender` |
+| Vínculo Acadêmico | amber | `projectRaw*` (→classId), `campus` (→campus), `courseRaw` (→courseId), `shift` |
+| Comercial | emerald | `tags` |
+
+Cada campo tem **dois selects**:
+1. **Coluna da Planilha** — mapeamento por header da planilha; desabilitado se Vínculo Direto ativo
+2. **Vínculo Direto** — valor fixo do sistema; badge `"Valor Fixo Ativo"` quando preenchido
+
+---
+
+#### Auto-fill ao selecionar Projeto (Vínculo Direto)
+
+`handleDirectBindClass(classId)`:
+1. Preenche `institutionId` a partir da turma
+2. Obtém `institution.campi` → se `campi.length === 1` → preenche `campus` automaticamente
+3. Obtém `class.courseIds` → filtra para objetos Course → se `length === 1` → preenche `courseId` automaticamente
+4. Pré-preenche `projectMap` para todos os valores únicos já conhecidos na coluna `projectRaw`
+5. Exibe chips de Instituição e Cursos confirmando o vínculo
+
+---
+
+#### Opções de Vínculo Direto filtradas
+
+| Campo | Quando projeto selecionado | Sem projeto |
+|-------|---------------------------|-------------|
+| Campus | `institution.campi[].name` da inst. do projeto | todos os campi de todas as instituições (deduplicados) |
+| Curso | `courses.filter(c => class.courseIds.includes(c.id))` | todos os cursos |
+
+Campus é sempre uma **string** (`campus.name`), nunca UUID. Alinhado com `Client.campus: string` e `Institution.campi: Campus[]` em `types.ts`.
+
+---
+
+#### Payload enviado a `onImport`
+
+Para cada linha vinculada:
+```typescript
+{
+  name, phone, email, cpf,
+  birthDate,     // raw — excelDateToISO aplicado em handleBulkImport (Clients.tsx)
+  gender, tags, shift,
+  campus,        // string — directBinds.campus || coluna raw
+  classId,       // UUID — projectMap[rawVal] || directBinds.classId
+  institutionId, // UUID — cls?.institutionId || directBinds.institutionId
+  courseId,      // UUID — directBinds.courseId || cls?.courseIds[0] || coluna raw
+}
+```
+
+`handleBulkImport` em `Clients.tsx` não foi alterado — continua usando `linkedClass?.institutionId` com prioridade máxima (correto).
+
+---
+
+### Observação técnica #33
+
+**`ClientImportModal` — versão definitiva (Sessão 18):** `components/ClientImportModal.tsx` reescrito com 4 etapas dinâmicas (3 quando projeto via vínculo direto). Tipos: `ColumnMap` (sem `institutionRaw`) + `DirectBinds` (com `campus: string` em vez de `institutionId` de UI). Instituição não aparece como campo mapeável — é derivada automaticamente do projeto selecionado. Campus = `institution.campi[].name` (string, não UUID). Auto-fill: ao selecionar projeto via vínculo direto, campus é preenchido se `campi.length === 1` e courseId se `courseIds.length === 1`. Skip da Etapa 3: quando `directBinds.classId !== ''` e `columnMap.projectRaw === ''`. Stepper dinâmico: exibe 3 ou 4 etapas conforme o skip. TypeScript compila sem erros novos.
+
+---
+
+## 🗺️ Próximos passos (Sessão 19+)
+
+### 1. Campo "Número de Formandos Totais" no Projeto ⬅ próxima tarefa
+- Adicionar campo `totalStudents?: number` na interface `ClassRoom` (`types.ts`)
+- Migration: `ALTER TABLE classes ADD COLUMN IF NOT EXISTS total_students INTEGER`
+- Exibir e editar no formulário de Turmas + painel de detalhes
+- Usar no Dashboard para calcular % de carteira vs meta
+
+### 2. `ClientImportModal` — Etapa 3 expandida (Vínculo por Valores Únicos)
+- Além de vincular **Projeto** por valor único da planilha, expandir para vincular **Campus**, **Curso** e **Turma** da mesma forma
+- Para cada valor único de `campus` na planilha → select de campus da instituição
+- Para cada valor único de `courseRaw` → select de curso do projeto
+- Permite importações multi-campus / multi-curso em um único arquivo
+
+### 3. Padronização dos painéis de detalhes
+- Auditar todos os módulos e garantir que o padrão visual oficial (obs. #17) está consistente
+
+### 4. Responsividade mobile
 - Revisar os principais módulos (Dashboard, Clients, Turmas, CSDailyServices) para uso em telas < 768px
 
-### 7. Funis no Painel do Cliente (`ClientProfileView`)
+### 5. Funis no Painel do Cliente (`ClientProfileView`)
 - Exibir o funil atual do cliente com o estágio destacado
 - Permitir mover o cliente entre etapas diretamente do painel lateral
 - Mostrar histórico de movimentações de etapa na timeline
 
-### 8. Melhorias do Dashboard — 3 seções planejadas
+### 6. Melhorias do Dashboard — 3 seções planejadas
 
 **Seção A — Desempenho por Consultor**
 - Ranking de consultores por volume de vendas e taxa de conversão
@@ -1299,11 +1414,11 @@ gcloud run deploy crm-top-formaturas `
 **Seção C — Ações CS por ROI**
 - Top 5 campanhas com maior retorno sobre investimento (tabela)
 
-### 9. Deploy das Edge Functions (pendente desde Sessão 11)
+### 7. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
 
-### 10. Integrações futuras
+### 8. Integrações futuras
 - **WhatsApp**: integração com API (envio de mensagens a partir de atendimentos)
 - **ARES**: integração com sistema ERP para sincronização de vendas e dados de formandos
 
@@ -1398,3 +1513,5 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
     - Stepper de 5 passos visível em todas as etapas (4 e 5 opacos até implementação)
     - `BulkImportModal` genérico **preservado** — outros módulos continuam usando
     - `Clients.tsx`: troca `BulkImportModal` por `ClientImportModal`; remove `importFields`; `handleBulkImport` intocado
+
+33. **`ClientImportModal` — versão definitiva (Sessão 18):** `components/ClientImportModal.tsx` reescrito com 4 etapas dinâmicas (3 quando projeto via vínculo direto apenas). Tipos: `ColumnMap` (sem `institutionRaw`) + `DirectBinds` (com `campus: string` em vez de widget de instituição). Instituição não aparece como campo mapeável — derivada automaticamente do projeto selecionado. Campus = `institution.campi[].name` (string, não UUID), alinhado com `Client.campus: string` e `Institution.campi: Campus[]` de `types.ts`. Auto-fill: ao selecionar projeto via vínculo direto, campus preenche se `campi.length === 1` e courseId se `courseIds.length === 1`. Skip da Etapa 3: `directBinds.classId !== ''` && `columnMap.projectRaw === ''` → stepper exibe 3 etapas e avança diretamente de Colunas para Confirmar. Dois selects por campo (Coluna da Planilha + Vínculo Direto). Badge `"Valor Fixo Ativo"` quando vínculo direto está preenchido. TypeScript compila sem erros novos.
