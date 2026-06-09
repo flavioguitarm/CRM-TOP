@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useData } from '../store';
-import { 
-  X, Check, User, Mail, Phone, GraduationCap, Building2, Clock3, 
+import {
+  X, Check, User, Mail, Phone, GraduationCap, Building2, Clock3,
   Tag as TagIcon, MessageSquare, Plus, ShoppingCart, DollarSign,
   TrendingUp, AlertCircle, CheckCircle2, XCircle, ArrowRight, History, Hash,
   ListTodo, Calendar, Clock, Trash2, CheckCircle, Package, AlertTriangle,
-  Download
+  Download, GitBranch, ChevronDown
 } from 'lucide-react';
-import { Activity, UserRole, Task, ProductNegotiation, Sale } from '../types';
+import { Activity, UserRole, Task, ProductNegotiation, Sale, ClientFunnelEntry } from '../types';
 import * as XLSX from 'xlsx';
 import ConfirmModal from './ConfirmModal';
 import ActivityTimeline from './ActivityTimeline';
@@ -62,7 +62,9 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
     clients, institutions, courses, classes, currentUser, users,
     addClientActivity, products, sales, addSale, updateSale, deleteSale,
     negotiations, addNegotiation, deleteNegotiation, updateNegotiationStatus,
-    tasks, addTask, toggleTask, deleteTask
+    tasks, addTask, toggleTask, deleteTask,
+    funnels,
+    clientFunnelEntries, addClientFunnelEntry, updateClientFunnelEntryStage, removeClientFunnelEntry,
   } = useData();
 
   const [newActivity, setNewActivity] = useState({ description: '', type: 'note' as any });
@@ -71,6 +73,12 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
   const [quantity, setQuantity] = useState('1');
   const [newTask, setNewTask] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '09:00' });
   const [pendingDeleteNeg, setPendingDeleteNeg] = useState<ProductNegotiation | null>(null);
+
+  // ── Funis Ativos ──────────────────────────────────────────────────────────
+  const [showAddFunnelModal, setShowAddFunnelModal] = useState(false);
+  const [addFunnelId, setAddFunnelId] = useState('');
+  const [addStageId, setAddStageId] = useState('');
+  const [pendingRemoveFunnelEntry, setPendingRemoveFunnelEntry] = useState<ClientFunnelEntry | null>(null);
 
   const client = clients.find(c => c.id === clientId);
   if (!client) return <div className="p-12 text-center text-slate-400">Lead não encontrado.</div>;
@@ -119,6 +127,39 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
     );
   }, [clientNegotiations, clientSales, allowedClassProducts]);
   const clientTasks = useMemo(() => tasks.filter(t => t.clientId === client.id).sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), [tasks, client.id]);
+
+  // Entradas de funil deste cliente
+  const myFunnelEntries = useMemo(
+    () => clientFunnelEntries.filter(e => e.clientId === client.id),
+    [clientFunnelEntries, client.id]
+  );
+
+  // Funis disponíveis para adicionar (não inclui funis onde o cliente já está)
+  const funnelsNotJoined = useMemo(
+    () => funnels.filter(f => !myFunnelEntries.some(e => e.funnelId === f.id)),
+    [funnels, myFunnelEntries]
+  );
+
+  const handleMoveStage = async (entry: ClientFunnelEntry, newStageId: string) => {
+    const funnel = funnels.find(f => f.id === entry.funnelId);
+    const oldStage = funnel?.stages.find(s => s.id === entry.stageId);
+    const newStage = funnel?.stages.find(s => s.id === newStageId);
+    await updateClientFunnelEntryStage(entry.id, newStageId);
+    if (funnel && oldStage && newStage) {
+      handleAddActivity(
+        `Movido no funil ${funnel.name}: ${oldStage.name} → ${newStage.name}`,
+        'move'
+      );
+    }
+  };
+
+  const handleAddToFunnel = async () => {
+    if (!addFunnelId || !addStageId) return;
+    await addClientFunnelEntry(client.id, addFunnelId, addStageId);
+    setShowAddFunnelModal(false);
+    setAddFunnelId('');
+    setAddStageId('');
+  };
 
   const handleAddActivity = (text: string, type?: Activity['type']) => {
     if (!text) return;
@@ -505,6 +546,99 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
           })()}
         </section>
 
+        {/* Funis Ativos */}
+        <section className="space-y-4 pt-6 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <GitBranch size={14} className="text-amber-500" /> Funis Ativos
+            </h4>
+            {!isVisualizador && funnelsNotJoined.length > 0 && (
+              <button
+                onClick={() => setShowAddFunnelModal(true)}
+                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-600 transition-colors"
+              >
+                <Plus size={12} /> Adicionar ao Funil
+              </button>
+            )}
+          </div>
+
+          {myFunnelEntries.length === 0 ? (
+            <div className="bg-slate-800 rounded-xl p-5 text-center space-y-3">
+              <p className="text-xs text-slate-400 font-bold">
+                Este cliente ainda não está em nenhum funil.
+              </p>
+              {!isVisualizador && funnels.length > 0 && (
+                <button
+                  onClick={() => setShowAddFunnelModal(true)}
+                  className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Plus size={12} /> Adicionar ao Funil
+                </button>
+              )}
+              {funnels.length === 0 && (
+                <p className="text-[10px] text-slate-500 font-bold">
+                  Nenhum funil cadastrado no sistema.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myFunnelEntries.map(entry => {
+                const funnel = funnels.find(f => f.id === entry.funnelId);
+                if (!funnel) return null;
+                const currentStage = funnel.stages.find(s => s.id === entry.stageId);
+                const sortedStages = [...funnel.stages].sort((a, b) => a.order - b.order);
+                return (
+                  <div key={entry.id} className="bg-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <GitBranch size={14} className="text-slate-400" />
+                        <span className="text-xs font-black text-white uppercase tracking-tight">
+                          {funnel.name}
+                        </span>
+                      </div>
+                      {currentStage && (
+                        <span
+                          className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-full font-bold"
+                          style={currentStage.color ? { borderLeft: `3px solid ${currentStage.color}` } : {}}
+                        >
+                          {currentStage.name}
+                        </span>
+                      )}
+                    </div>
+
+                    {!isVisualizador && (
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <select
+                            value={entry.stageId}
+                            onChange={e => handleMoveStage(entry, e.target.value)}
+                            className="w-full appearance-none bg-slate-700 border border-slate-600 text-white text-xs font-bold rounded-lg px-3 py-2 pr-8 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                          >
+                            {sortedStages.map(stage => (
+                              <option key={stage.id} value={stage.id}>
+                                {stage.name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                        <button
+                          onClick={() => setPendingRemoveFunnelEntry(entry)}
+                          className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-700 rounded-lg transition-colors"
+                          title="Remover do funil"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Timeline de Atividades */}
         <section className="space-y-4 pt-6 border-t border-slate-100">
           <div className="flex items-center justify-between">
@@ -537,6 +671,80 @@ const ClientProfileView: React.FC<Props> = ({ clientId }) => {
           onConfirm={confirmDeleteNegotiation}
           onCancel={() => setPendingDeleteNeg(null)}
         />
+      )}
+
+      {pendingRemoveFunnelEntry && (
+        <ConfirmModal
+          title="Remover do Funil"
+          message={`Deseja remover este cliente do funil "${funnels.find(f => f.id === pendingRemoveFunnelEntry.funnelId)?.name || ''}"?`}
+          confirmLabel="Sim, Remover"
+          onConfirm={async () => {
+            await removeClientFunnelEntry(pendingRemoveFunnelEntry.id);
+            setPendingRemoveFunnelEntry(null);
+          }}
+          onCancel={() => setPendingRemoveFunnelEntry(null)}
+        />
+      )}
+
+      {showAddFunnelModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-slate-900 rounded-2xl">
+                  <GitBranch size={20} className="text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Adicionar ao Funil</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{client.name}</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowAddFunnelModal(false); setAddFunnelId(''); setAddStageId(''); }} className="p-2 text-slate-400 hover:text-slate-700 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Funil</label>
+                <select
+                  value={addFunnelId}
+                  onChange={e => { setAddFunnelId(e.target.value); setAddStageId(''); }}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">Selecionar funil...</option>
+                  {funnelsNotJoined.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {addFunnelId && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Etapa Inicial</label>
+                  <select
+                    value={addStageId}
+                    onChange={e => setAddStageId(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">Selecionar etapa...</option>
+                    {[...(funnels.find(f => f.id === addFunnelId)?.stages ?? [])].sort((a, b) => a.order - b.order).map(stage => (
+                      <option key={stage.id} value={stage.id}>{stage.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleAddToFunnel}
+              disabled={!addFunnelId || !addStageId}
+              className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+            >
+              <Plus size={14} /> Adicionar ao Funil
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

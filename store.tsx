@@ -2,7 +2,7 @@
 // Ponto de restauração: restaur_00018
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ChannelType, ProjectClass, ProjectActivity } from './types';
+import { User, UserRole, Institution, Course, Product, ProductCategory, ClassRoom, Funnel, Client, Sale, Event, ProductNegotiation, NegotiationStatus, ClassProduct, CSAction, CSActionActivity, TrashItem, EventActivity, ActivityType, Task, CSDailyService, Activity, BackupSettings, BackupFile, DemandType, ChannelType, ProjectClass, ProjectActivity, ClientFunnelEntry } from './types';
 import { MOCK_USERS, MOCK_INSTITUTIONS, MOCK_COURSES, MOCK_PRODUCTS, MOCK_FUNNELS, MOCK_CLASSES, MOCK_CLIENTS, MOCK_SALES, MOCK_ACTIVITY_TYPES } from './constants';
 import { supabase } from './src/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -113,6 +113,11 @@ interface DataContextType {
   addCSDailyService: (service: CSDailyService) => void;
   updateCSDailyService: (service: CSDailyService) => void;
   deleteCSDailyService: (id: string) => void;
+  // ── Funis do Cliente ──────────────────────────────────────────────────────
+  clientFunnelEntries: ClientFunnelEntry[];
+  addClientFunnelEntry: (clientId: string, funnelId: string, stageId: string) => Promise<void>;
+  updateClientFunnelEntryStage: (entryId: string, stageId: string) => Promise<void>;
+  removeClientFunnelEntry: (entryId: string) => Promise<void>;
   // ── Turmas do Projeto ─────────────────────────────────────────────────────
   projectClasses: ProjectClass[];
   addProjectClass: (projectId: string, name: string) => Promise<void>;
@@ -759,6 +764,76 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTasks((data ?? []).map(mapTaskRow));
       });
   }, [tenantId]);
+
+  // ── ClientFunnelEntries ───────────────────────────────────────────────────
+  const [clientFunnelEntries, setClientFunnelEntries] = useState<ClientFunnelEntry[]>([]);
+
+  useEffect(() => {
+    if (!tenantId) { setClientFunnelEntries([]); return; }
+    supabase
+      .from('client_funnels')
+      .select('id, client_id, funnel_id, stage_id, created_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) { console.error('client_funnels fetch:', error.message); return; }
+        setClientFunnelEntries((data ?? []).map((r: any) => ({
+          id: r.id,
+          clientId: r.client_id,
+          funnelId: r.funnel_id,
+          stageId: r.stage_id,
+          createdAt: r.created_at,
+        })));
+      });
+  }, [tenantId]);
+
+  const addClientFunnelEntry = async (clientId: string, funnelId: string, stageId: string) => {
+    const entry: ClientFunnelEntry = {
+      id: crypto.randomUUID(),
+      clientId,
+      funnelId,
+      stageId,
+      createdAt: new Date().toISOString(),
+    };
+    setClientFunnelEntries(prev => [...prev, entry]);
+    if (tenantId) {
+      const { error } = await supabase.from('client_funnels').insert({
+        id: entry.id,
+        tenant_id: tenantId,
+        client_id: clientId,
+        funnel_id: funnelId,
+        stage_id: stageId,
+      });
+      if (error) {
+        console.error('addClientFunnelEntry:', error.message);
+        setClientFunnelEntries(prev => prev.filter(e => e.id !== entry.id));
+      }
+    }
+  };
+
+  const updateClientFunnelEntryStage = async (entryId: string, stageId: string) => {
+    setClientFunnelEntries(prev => prev.map(e => e.id === entryId ? { ...e, stageId } : e));
+    if (tenantId) {
+      const { error } = await supabase
+        .from('client_funnels')
+        .update({ stage_id: stageId })
+        .eq('id', entryId)
+        .eq('tenant_id', tenantId);
+      if (error) console.error('updateClientFunnelEntryStage:', error.message);
+    }
+  };
+
+  const removeClientFunnelEntry = async (entryId: string) => {
+    setClientFunnelEntries(prev => prev.filter(e => e.id !== entryId));
+    if (tenantId) {
+      const { error } = await supabase
+        .from('client_funnels')
+        .delete()
+        .eq('id', entryId)
+        .eq('tenant_id', tenantId);
+      if (error) console.error('removeClientFunnelEntry:', error.message);
+    }
+  };
 
   const [trash, setTrash] = useState<TrashItem[]>(() => load('trash', []));
   const [googleSheetUrl, setGoogleSheetUrl] = useState<string>(() => load('googleSheetUrl', ''));
@@ -2511,6 +2586,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addClassProduct, updateClassProduct, removeClassProduct,
       addCSAction, updateCSAction, addCSActionActivity, deleteCSAction,
       addCSDailyService, updateCSDailyService, deleteCSDailyService,
+      clientFunnelEntries, addClientFunnelEntry, updateClientFunnelEntryStage, removeClientFunnelEntry,
       projectClasses, addProjectClass, updateProjectClass, deleteProjectClass,
       projectActivities, addProjectActivity,
       resetDatabase, exportDatabase, importDatabase,

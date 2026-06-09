@@ -296,6 +296,15 @@ export interface ProductNegotiation {
   sellerId: string;
 }
 
+// ── Participação em funis (múltiplos funis por cliente) ──────────────────────
+export interface ClientFunnelEntry {
+  id: string;
+  clientId: string;
+  funnelId: string;
+  stageId: string;
+  createdAt: string;
+}
+
 export interface TrashItem {
   id: string;
   entityType: 'institution' | 'course' | 'product' | 'productCategory' | 'class' | 'user' | 'funnel' | 'event' | 'client' | 'csAction' | 'activityType' | 'csDailyService';
