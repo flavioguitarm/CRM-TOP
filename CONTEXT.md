@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-08 (Sessão 16 — concluída)
+> Atualizado em: 2026-06-08 (Sessão 17 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1267,35 +1267,43 @@ gcloud run deploy crm-top-formaturas `
 
 ---
 
-## 🗺️ Próximos passos (Sessão 17+)
+## 🗺️ Próximos passos (Sessão 18+)
 
 ### 1. ~~Script `deploy.ps1`~~ ✅ Concluído na Sessão 16
 ### 2. ~~Bug: Importação em massa não persiste após reload~~ ✅ Corrigido na Sessão 16
+### 3. ~~`ClientImportModal` — Etapas 1, 2 e 3~~ ✅ Concluído na Sessão 17
 
-### 3. Funis no Painel do Cliente (`ClientProfileView`)
+### 4. `ClientImportModal` — Etapas 4 e 5 (Parte 2) ⬅ próxima tarefa
+- **Etapa 4 — Funil:** seletor de funil + etapa (todos os clientes importados entram no mesmo funil inicial); padrão = primeiro funil + primeira etapa do banco
+- **Etapa 5 — Preview e confirmação:** contagem total × ignorados (sem projeto vinculado); agrupamento por projeto com lista de clientes; seletor ignore/overwrite; botão "Confirmar importação de N clientes" → chama `handleBulkImport` com dados limpos (classId, institutionId, funnelId, stageId já resolvidos como UUIDs reais; datas convertidas por `excelDateToISO`)
+
+### 5. Padronização dos painéis de detalhes
+- Auditar todos os módulos e garantir que o padrão visual oficial (obs. #17 do CONTEXT.md) está consistente
+
+### 6. Responsividade mobile
+- Revisar os principais módulos (Dashboard, Clients, Turmas, CSDailyServices) para uso em telas < 768px
+
+### 7. Funis no Painel do Cliente (`ClientProfileView`)
 - Exibir o funil atual do cliente com o estágio destacado
 - Permitir mover o cliente entre etapas diretamente do painel lateral
 - Mostrar histórico de movimentações de etapa na timeline
 
-### 4. Melhorias do Dashboard — 3 seções planejadas
+### 8. Melhorias do Dashboard — 3 seções planejadas
 
 **Seção A — Desempenho por Consultor**
 - Ranking de consultores por volume de vendas e taxa de conversão
-- Filtro por período e funil (reusa os filtros existentes)
 
 **Seção B — Funis em destaque**
-- Distribuição de clientes por etapa em cada funil
-- Gráfico de barras empilhadas por estágio
+- Distribuição de clientes por etapa em cada funil (stacked bar chart)
 
 **Seção C — Ações CS por ROI**
-- Top 5 campanhas com maior retorno sobre investimento
-- Tabela: campanha, custo, faturamento, ROI%
+- Top 5 campanhas com maior retorno sobre investimento (tabela)
 
-### 5. Deploy das Edge Functions (pendente desde Sessão 11)
+### 9. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
 
-### 6. Integrações futuras
+### 10. Integrações futuras
 - **WhatsApp**: integração com API (envio de mensagens a partir de atendimentos)
 - **ARES**: integração com sistema ERP para sincronização de vendas e dados de formandos
 
@@ -1378,3 +1386,15 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
 29. **`deploy.ps1` (Sessão 16):** script PowerShell na raiz do projeto. Lê `.env.local`, verifica pré-requisitos (`docker`, `gcloud`), executa 5 etapas sequenciais: configure-docker → build → push → deploy → describe URL. Para com erro vermelho se qualquer etapa falhar. Uso: `.\deploy.ps1`.
 
 30. **Bug importação em massa corrigido (Sessão 16):** causa raiz era `data.forEach` sem `await` — todos os inserts disparados em paralelo sobrecarregavam o Supabase (rate-limit/conexões). Correção aplicada em **8 arquivos**: `addClient` em `store.tsx` tornou-se `async` com `await` no insert + rollback; todos os `handleBulkImport` em `Clients.tsx`, `CSDailyServices.tsx`, `Turmas.tsx`, `Produtos.tsx`, `CSActions.tsx`, `Cursos.tsx`, `Eventos.tsx`, `Instituicoes.tsx` convertidos para `async` + `for...of` + `await`. Tipo `onImport` em `BulkImportModal` atualizado para `void | Promise<void>`.
+
+31. **Bugs de importação de Clientes corrigidos (Sessão 17):**
+    - **UUID inválido** (`invalid input syntax for type uuid: "f-vendas"`): `funnelId`/`stageId` hardcoded substituídos por `isValidUUID()` + fallback para `funnels[0].id` / `funnels[0].stages[0].id`
+    - **Datas Excel** (`date/time field value out of range: "45494.86..."`): `excelDateToISO(value)` — se número → `(serial − 25569) × 86400 × 1000` com correção do bug bissexto 1900; se string → `new Date()`; se inválido → `null`. Aplicado em `birthDate`, `soldDate`, `lostDate` (Clients), `date` (CSDailyServices), `startDateTime`/`endDateTime` (Eventos).
+
+32. **`ClientImportModal` — Parte 1 (Sessão 17):** novo componente dedicado `components/ClientImportModal.tsx` substitui o `BulkImportModal` genérico para Clientes. Fluxo guiado de 5 etapas (4 e 5 pendentes para Sessão 18):
+    - **Etapa 1 — Upload:** drag-and-drop; lê com `cellDates: false` para manter seriais brutos; mostra painel explicativo das 5 etapas
+    - **Etapa 2 — Mapeamento:** 13 campos em grid 2 colunas; `Projeto` e `Nome` obrigatórios; preview dos 3 primeiros valores distintos de cada coluna mapeada; feedback visual (amber = obrigatório vazio, emerald = mapeado)
+    - **Etapa 3 — Projetos:** um card por valor único da coluna Projeto; select de turmas (ordenado por nome + instituição); badges automáticos de Instituição, Curso e nº Produtos ao vincular; linhas sem vínculo ignoradas
+    - Stepper de 5 passos visível em todas as etapas (4 e 5 opacos até implementação)
+    - `BulkImportModal` genérico **preservado** — outros módulos continuam usando
+    - `Clients.tsx`: troca `BulkImportModal` por `ClientImportModal`; remove `importFields`; `handleBulkImport` intocado
