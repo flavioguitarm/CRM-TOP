@@ -61,7 +61,7 @@ const ColorPicker: React.FC<{ selected: string, onSelect: (c: string) => void }>
 };
 
 const FunnelConfig: React.FC = () => {
-  const { funnels, users, clients, updateFunnel, addFunnel, deleteFunnel, isStageOccupied, currentUser } = useData();
+  const { funnels, users, clients, clientFunnelEntries, updateFunnel, addFunnel, deleteFunnel, isStageOccupied, currentUser } = useData();
   const [selectedFunnel, setSelectedFunnel] = useState<Funnel | null>(null); // modo edição de etapas
   const [detailFunnel,   setDetailFunnel]   = useState<Funnel | null>(null); // painel de detalhes
   const [isAddingFunnel, setIsAddingFunnel] = useState(false);
@@ -70,21 +70,22 @@ const FunnelConfig: React.FC = () => {
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-  // Contagem de clientes por etapa de um funil
+  // Contagem de clientes por etapa de um funil (fonte: client_funnels)
   const clientsByStage = useMemo(() => {
     const map: Record<string, number> = {};
     if (!detailFunnel) return map;
-    clients.forEach(c => {
-      if (c.funnelId === detailFunnel.id) {
-        map[c.stageId] = (map[c.stageId] || 0) + 1;
-      }
-    });
+    clientFunnelEntries
+      .filter(e => e.funnelId === detailFunnel.id)
+      .forEach(e => { map[e.stageId] = (map[e.stageId] || 0) + 1; });
     return map;
-  }, [clients, detailFunnel]);
+  }, [clientFunnelEntries, detailFunnel]);
 
   const handleExportStage = (funnel: Funnel, stage: FunnelStage) => {
+    const clientIdsInStage = new Set(
+      clientFunnelEntries.filter(e => e.funnelId === funnel.id && e.stageId === stage.id).map(e => e.clientId)
+    );
     const rows = clients
-      .filter(c => c.funnelId === funnel.id && c.stageId === stage.id)
+      .filter(c => clientIdsInStage.has(c.id))
       .map(c => ({ Nome: c.name, Email: c.email, Telefone: c.phone, Etapa: stage.name }));
     if (!rows.length) { alert('Nenhum cliente nesta etapa.'); return; }
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -94,10 +95,13 @@ const FunnelConfig: React.FC = () => {
   };
 
   const handleExportFunnel = (funnel: Funnel) => {
+    const entriesInFunnel = clientFunnelEntries.filter(e => e.funnelId === funnel.id);
+    const clientIdsInFunnel = new Set(entriesInFunnel.map(e => e.clientId));
     const rows = clients
-      .filter(c => c.funnelId === funnel.id)
+      .filter(c => clientIdsInFunnel.has(c.id))
       .map(c => {
-        const stage = funnel.stages.find(s => s.id === c.stageId);
+        const entry = entriesInFunnel.find(e => e.clientId === c.id);
+        const stage = funnel.stages.find(s => s.id === entry?.stageId);
         return { Nome: c.name, Email: c.email, Telefone: c.phone, Etapa: stage?.name || '—', 'Total (R$)': c.totalValue };
       });
     if (!rows.length) { alert('Nenhum cliente neste funil.'); return; }
@@ -284,7 +288,7 @@ const FunnelConfig: React.FC = () => {
               </div>
             )}
             {funnels.map(funnel => {
-              const totalClients = clients.filter(c => c.funnelId === funnel.id).length;
+              const totalClients = clientFunnelEntries.filter(e => e.funnelId === funnel.id).length;
               const isSelected = detailFunnel?.id === funnel.id;
               return (
                 <div
@@ -320,7 +324,7 @@ const FunnelConfig: React.FC = () => {
         {/* Painel de detalhes (sem backdrop) */}
         {detailFunnel && (() => {
           const f = funnels.find(fn => fn.id === detailFunnel.id) || detailFunnel;
-          const totalClients = clients.filter(c => c.funnelId === f.id).length;
+          const totalClients = clientFunnelEntries.filter(e => e.funnelId === f.id).length;
           return (
             <div className="w-1/2 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-in slide-in-from-right-4 duration-200">
               {/* Cabeçalho */}
