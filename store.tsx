@@ -52,7 +52,7 @@ interface DataContextType {
   restoreFromTrash: (trashId: string) => void;
   permanentDeleteFromTrash: (trashIds: string[]) => void;
   purgeExpiredTrash: () => void;
-  updateClientStage: (clientId: string, newStageId: string) => void;
+  updateClientStage: (clientId: string, newStageId: string, funnelId: string) => void;
   addClientActivity: (clientId: string, activity: any) => void;
   addClient: (client: Client) => Promise<void>;
   updateClient: (client: Client) => void;
@@ -1237,14 +1237,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { can: true };
   };
 
-  const updateClientStage = (clientId: string, newStageId: string) => {
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, stageId: newStageId } : c));
-    if (tenantId) {
-      supabase.from('clients')
-        .update({ stage_id: newStageId })
-        .eq('id', clientId).eq('tenant_id', tenantId)
-        .then(({ error }) => { if (error) console.error('updateClientStage:', error.message); });
-    }
+  const updateClientStage = (clientId: string, newStageId: string, funnelId: string) => {
+    // Fonte de verdade agora é client_funnels — delega para updateClientFunnelEntryStage
+    const entry = clientFunnelEntries.find(e => e.clientId === clientId && e.funnelId === funnelId);
+    if (!entry) { console.warn('updateClientStage: entry não encontrada para', clientId, funnelId); return; }
+    updateClientFunnelEntryStage(entry.id, newStageId);
   };
 
   const addClientActivity = (clientId: string, activity: any) => {

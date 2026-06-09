@@ -64,7 +64,7 @@ const NewLeadModal: React.FC<{
   funnelId: string;
   onClose: () => void;
 }> = ({ funnelId, onClose }) => {
-  const { clients, institutions, courses, classes, currentUser, addClient, updateClient, funnels } = useData();
+  const { clients, institutions, courses, classes, currentUser, addClient, addClientActivity, funnels, clientFunnelEntries, addClientFunnelEntry } = useData();
   const [tab, setTab] = useState<'manual' | 'base'>('manual');
   const currentFunnel = funnels.find(f => f.id === funnelId);
   
@@ -72,9 +72,10 @@ const NewLeadModal: React.FC<{
   const [formData, setFormData] = useState<Partial<Client>>({
     name: '', email: '', phone: '', cpf: '', birthDate: '', gender: '',
     institutionId: '', campus: '', courseId: '', classId: '', shift: '', tags: [],
-    funnelId: funnelId, stageId: currentFunnel?.stages[0]?.id || '',
     totalValue: 0, purchasesCount: 0, activities: [], createdAt: new Date().toISOString().split('T')[0], sellerId: currentUser?.id || ''
   });
+  // Etapa selecionada no form manual (não vai para client, vai para client_funnels)
+  const [manualStageId, setManualStageId] = useState(currentFunnel?.stages[0]?.id || '');
   const [tagsInput, setTagsInput] = useState('');
 
   // Tab Base (Filtros) State
@@ -127,54 +128,52 @@ const NewLeadModal: React.FC<{
   // Filtro de leads da base
   const eligibleFromBase = useMemo(() => {
     return clients.filter(c => {
-      const notInThisFunnel = c.funnelId !== funnelId;
+      const notInThisFunnel = !clientFunnelEntries.some(e => e.clientId === c.id && e.funnelId === funnelId);
       const matchInst = !filterInst || c.institutionId === filterInst;
       const matchClass = !filterClass || c.classId === filterClass;
       const matchCourse = !filterCourse || c.courseId === filterCourse;
       return notInThisFunnel && matchInst && matchClass && matchCourse;
     });
-  }, [clients, funnelId, filterInst, filterClass, filterCourse]);
+  }, [clients, clientFunnelEntries, funnelId, filterInst, filterClass, filterCourse]);
 
-  const handleManualSave = (e: React.FormEvent) => {
+  const handleManualSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (duplicate.email || duplicate.cpf || duplicate.phone) {
       alert("Corrija os dados duplicados antes de prosseguir.");
       return;
     }
     const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
-    addClient({ 
-      ...formData, 
-      id: crypto.randomUUID(),
+    const newId = crypto.randomUUID();
+    const stageName = currentFunnel?.stages.find(s => s.id === manualStageId)?.name || 'Etapa inicial';
+    await addClient({
+      ...formData,
+      id: newId,
       tags,
+      funnelId: '',
+      stageId: '',
       activities: [{
         id: crypto.randomUUID(),
         type: 'note',
-        description: `Negociação iniciada via cadastro individual completo na etapa: ${currentFunnel?.stages.find(s => s.id === formData.stageId)?.name}`,
+        description: `Lead inserido no funil "${currentFunnel?.name}" na etapa "${stageName}".`,
         timestamp: new Date().toLocaleString('pt-BR')
       }]
     } as Client);
+    await addClientFunnelEntry(newId, funnelId, manualStageId);
     onClose();
   };
 
-  const handleBaseSave = () => {
+  const handleBaseSave = async () => {
     if (selectedBaseIds.size === 0 || !targetStageId) return;
     const stageName = currentFunnel?.stages.find(s => s.id === targetStageId)?.name || 'Etapa selecionada';
-    selectedBaseIds.forEach(id => {
-      const client = clients.find(c => c.id === id);
-      if (client) {
-        updateClient({
-          ...client,
-          funnelId: funnelId,
-          stageId: targetStageId,
-          activities: [{
-            id: crypto.randomUUID(),
-            type: 'note',
-            description: `Lead importado para o funil "${currentFunnel?.name}" na etapa "${stageName}" por ${currentUser?.name}.`,
-            timestamp: new Date().toLocaleString('pt-BR')
-          }, ...client.activities]
-        });
-      }
-    });
+    for (const id of selectedBaseIds) {
+      await addClientFunnelEntry(id, funnelId, targetStageId);
+      addClientActivity(id, {
+        id: crypto.randomUUID(),
+        type: 'note',
+        description: `Lead importado para o funil "${currentFunnel?.name}" na etapa "${stageName}" por ${currentUser?.name}.`,
+        timestamp: new Date().toLocaleString('pt-BR')
+      });
+    }
     onClose();
   };
 
@@ -270,7 +269,7 @@ const NewLeadModal: React.FC<{
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-900 uppercase">Etapa de Entrada *</label>
-                      <select required className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl px-4 py-4 text-sm font-black text-amber-900 shadow-xl" value={formData.stageId} onChange={e => setFormData({...formData, stageId: e.target.value})}>
+                      <select required className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl px-4 py-4 text-sm font-black text-amber-900 shadow-xl" value={manualStageId} onChange={e => setManualStageId(e.target.value)}>
                         {currentFunnel?.stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                     </div>
@@ -354,18 +353,28 @@ const NewLeadModal: React.FC<{
 };
 
 const BulkMoveModal: React.FC<{ onClose: () => void; funnelId: string; }> = ({ onClose, funnelId }) => {
-  const { clients, funnels, updateClientStage } = useData();
+  const { clients, funnels, clientFunnelEntries, updateClientFunnelEntryStage } = useData();
   const currentFunnel = funnels.find(f => f.id === funnelId);
   const [sourceStage, setSourceStage] = useState('');
   const [targetStage, setTargetStage] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const stageOptions = currentFunnel?.stages.map(s => ({ id: s.id, label: s.name })) || [];
-  const eligibleLeads = useMemo(() => clients.filter(c => c.funnelId === funnelId && c.stageId === sourceStage), [clients, funnelId, sourceStage]);
 
-  const handleApply = () => {
+  // Clientes neste funil que estão na etapa de origem (lê de client_funnels)
+  const eligibleLeads = useMemo(() => {
+    const clientIdsInStage = clientFunnelEntries
+      .filter(e => e.funnelId === funnelId && e.stageId === sourceStage)
+      .map(e => e.clientId);
+    return clients.filter(c => clientIdsInStage.includes(c.id));
+  }, [clients, clientFunnelEntries, funnelId, sourceStage]);
+
+  const handleApply = async () => {
     if (selectedIds.size && targetStage) {
-      selectedIds.forEach(id => updateClientStage(id, targetStage));
+      for (const clientId of selectedIds) {
+        const entry = clientFunnelEntries.find(e => e.clientId === clientId && e.funnelId === funnelId);
+        if (entry) await updateClientFunnelEntryStage(entry.id, targetStage);
+      }
       onClose();
     }
   };
@@ -425,7 +434,7 @@ const BulkMoveModal: React.FC<{ onClose: () => void; funnelId: string; }> = ({ o
 };
 
 const FunnelView: React.FC = () => {
-  const { funnels, clients, updateClientStage, currentUser, updateClient, moveToTrash, updateNegotiationStatus, addSale } = useData();
+  const { funnels, clients, currentUser, updateClient, moveToTrash, updateNegotiationStatus, addSale, clientFunnelEntries, updateClientFunnelEntryStage } = useData();
   const [selectedFunnelId, setSelectedFunnelId] = useState(funnels[0]?.id);
   const [searchTerm, setSearchTerm] = useState('');
   const [moveBulkOpen, setMoveBulkOpen] = useState(false);
@@ -437,35 +446,44 @@ const FunnelView: React.FC = () => {
   const currentFunnel = funnels.find(f => f.id === selectedFunnelId);
   const perms = usePermissions('funil');
 
+  // IDs dos clientes presentes no funil selecionado (fonte: client_funnels)
+  const clientIdsInFunnel = useMemo(
+    () => new Set(clientFunnelEntries.filter(e => e.funnelId === selectedFunnelId).map(e => e.clientId)),
+    [clientFunnelEntries, selectedFunnelId]
+  );
+
   const filteredClients = useMemo(() => {
-    return clients.filter(c => 
-      c.funnelId === selectedFunnelId && (
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    const term = searchTerm.toLowerCase();
+    return clients.filter(c =>
+      clientIdsInFunnel.has(c.id) && (
+        c.name.toLowerCase().includes(term) ||
+        c.tags.some(tag => tag.toLowerCase().includes(term))
       )
     );
-  }, [clients, searchTerm, selectedFunnelId]);
+  }, [clients, clientIdsInFunnel, searchTerm]);
+
+  // Helper: entry do cliente no funil atualmente selecionado
+  const getEntry = (clientId: string) =>
+    clientFunnelEntries.find(e => e.clientId === clientId && e.funnelId === selectedFunnelId);
 
   const handleWinQuick = (client: Client) => {
     const winStage = currentFunnel?.stages.find(s => s.type === 'WON');
     if (!winStage) return alert("Não há uma etapa de 'VENDA' configurada neste funil.");
-    
-    updateClientStage(client.id, winStage.id);
+    const entry = getEntry(client.id);
+    if (entry) updateClientFunnelEntryStage(entry.id, winStage.id);
     updateNegotiationStatus(client.id, 'GANHO');
-    
     const activity = { id: crypto.randomUUID(), type: 'note', description: 'Venda confirmada via botão rápido no Funil.', timestamp: new Date().toLocaleString() };
-    updateClient({ ...client, stageId: winStage.id, activities: [activity, ...client.activities] });
+    updateClient({ ...client, activities: [activity, ...client.activities] });
   };
 
   const handleLoseQuick = (client: Client) => {
     const loseStage = currentFunnel?.stages.find(s => s.type === 'LOST');
     if (!loseStage) return alert("Não há uma etapa de 'PERDA' configurada neste funil.");
-    
-    updateClientStage(client.id, loseStage.id);
+    const entry = getEntry(client.id);
+    if (entry) updateClientFunnelEntryStage(entry.id, loseStage.id);
     updateNegotiationStatus(client.id, 'PERDIDO');
-    
     const activity = { id: crypto.randomUUID(), type: 'note', description: 'Negociação marcada como perdida via botão rápido.', timestamp: new Date().toLocaleString() };
-    updateClient({ ...client, stageId: loseStage.id, activities: [activity, ...client.activities] });
+    updateClient({ ...client, activities: [activity, ...client.activities] });
   };
 
   // Drag and Drop Logic
@@ -479,7 +497,9 @@ const FunnelView: React.FC = () => {
 
   const onDrop = (e: React.DragEvent, targetStageId: string) => {
     const dealId = e.dataTransfer.getData('dealId');
-    if (dealId) updateClientStage(dealId, targetStageId);
+    if (!dealId) return;
+    const entry = getEntry(dealId);
+    if (entry) updateClientFunnelEntryStage(entry.id, targetStageId);
   };
 
   if (!currentFunnel) return null;
@@ -522,7 +542,10 @@ const FunnelView: React.FC = () => {
       <div className="flex-1 overflow-x-auto pb-6 custom-scrollbar">
         <div className="flex gap-6 min-w-max h-full pr-10">
           {currentFunnel.stages.sort((a, b) => a.order - b.order).map(stage => {
-            const stageClients = filteredClients.filter(c => c.stageId === stage.id);
+            const stageClients = filteredClients.filter(c => {
+              const entry = clientFunnelEntries.find(e => e.clientId === c.id && e.funnelId === selectedFunnelId);
+              return entry?.stageId === stage.id;
+            });
             const isSelectedAll = stageClients.length > 0 && stageClients.every(c => selectedDealIds.has(c.id));
 
             return (
