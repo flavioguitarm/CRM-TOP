@@ -108,6 +108,24 @@ const ClassModal: React.FC<{
              </div>
           </section>
 
+          <section className="space-y-4 pt-6 border-t border-slate-100">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Users size={14}/> Dimensionamento</h4>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                Nº de Formandos Totais
+                <HelpTooltip text="Total de alunos elegíveis (formandos) neste projeto. Usado para calcular o percentual de carteira cadastrada no CRM em relação ao universo total da turma." />
+              </label>
+              <input
+                type="number"
+                min={0}
+                placeholder="Ex: 120"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.totalStudents ?? ''}
+                onChange={e => setFormData({ ...formData, totalStudents: e.target.value === '' ? undefined : parseInt(e.target.value) })}
+              />
+            </div>
+          </section>
+
           <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-xl sticky bottom-0">Salvar Dados da Turma</button>
         </form>
       </div>
@@ -352,7 +370,7 @@ const ClassProductModal: React.FC<{
 };
 
 const TurmasAdmin: React.FC = () => {
-  const { classes, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users, projectClasses, addProjectClass, updateProjectClass, deleteProjectClass, funnels, addFunnel, projectActivities, addProjectActivity, currentUser } = useData();
+  const { classes, clients, institutions, courses, addClass, updateClass, moveToTrash, events, sales, removeClassProduct, products, users, projectClasses, addProjectClass, updateProjectClass, deleteProjectClass, funnels, addFunnel, projectActivities, addProjectActivity, currentUser } = useData();
   const navigate = useNavigate();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -677,6 +695,35 @@ const TurmasAdmin: React.FC = () => {
                   <p className="text-xl font-black">{new Date(selectedClass.createdAt).toLocaleDateString()}</p>
                </div>
             </div>
+
+            {(() => {
+              const totalStudents = selectedClass.totalStudents;
+              const clientsInClass = clients.filter(c => c.classId === selectedClass.id).length;
+              const pctClients = totalStudents && totalStudents > 0 ? (clientsInClass / totalStudents) * 100 : null;
+              return (
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-3xl px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <Users size={20} className="text-slate-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Formandos Totais</p>
+                      {totalStudents ? (
+                        <p className="text-sm font-black text-slate-900">
+                          {clientsInClass} / {totalStudents}
+                          <span className="ml-2 text-xs font-bold text-slate-500">— {pctClients!.toFixed(0)}% na carteira</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs font-bold text-slate-400 italic">Não informado</p>
+                      )}
+                    </div>
+                  </div>
+                  {totalStudents && pctClients !== null && (
+                    <div className="w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${Math.min(pctClients, 100)}%` }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <section className="space-y-4">
                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><User size={14}/> Responsáveis pela Operação</h4>

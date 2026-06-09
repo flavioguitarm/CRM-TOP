@@ -94,6 +94,7 @@ export interface ClassRoom {
   comercialExterno?: string;
   gestorProjeto?: string;
   consultorCSId?: string;
+  totalStudents?: number;
 }
 
 export interface TimelineEvent {

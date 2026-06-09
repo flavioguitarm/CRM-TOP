@@ -150,6 +150,7 @@ function mapClassRow(row: any): ClassRoom {
     comercialExterno: row.comercial_externo ?? '',
     gestorProjeto: row.gestor_projeto ?? '',
     consultorCSId: row.consultor_cs_id ?? '',
+    totalStudents: row.total_students ?? undefined,
     createdAt: row.created_at?.split('T')[0] ?? '',
     classProducts: (row.class_products ?? []).map((cp: any) => ({
       id: cp.id,
@@ -1646,6 +1647,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         comercial_externo: newClass.comercialExterno || null,
         gestor_projeto: newClass.gestorProjeto || null,
         consultor_cs_id: newClass.consultorCSId || null,
+        total_students: newClass.totalStudents ?? null,
       })
       .select('id, created_at')
       .single();
@@ -1678,6 +1680,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         comercial_externo: updatedClass.comercialExterno || null,
         gestor_projeto: updatedClass.gestorProjeto || null,
         consultor_cs_id: updatedClass.consultorCSId || null,
+        total_students: updatedClass.totalStudents ?? null,
       })
       .eq('id', updatedClass.id)
       .eq('tenant_id', tenantId);
