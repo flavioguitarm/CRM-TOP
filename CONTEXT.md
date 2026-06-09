@@ -1,6 +1,6 @@
 # CRM-TOP — Contexto de Desenvolvimento
 
-> Atualizado em: 2026-06-09 (Sessão 18 — concluída)
+> Atualizado em: 2026-06-09 (Sessão 19 — concluída)
 > Usar como briefing ao retomar a sessão no Claude Code.
 
 ---
@@ -1378,32 +1378,77 @@ Para cada linha vinculada:
 
 ---
 
-## 🗺️ Próximos passos (Sessão 19+)
+## ✅ Sessão 19 — totalStudents + ClientImportModal Etapa 3 expandida (2026-06-09)
 
-### 1. Campo "Número de Formandos Totais" no Projeto ⬅ próxima tarefa
-- Adicionar campo `totalStudents?: number` na interface `ClassRoom` (`types.ts`)
-- Migration: `ALTER TABLE classes ADD COLUMN IF NOT EXISTS total_students INTEGER`
-- Exibir e editar no formulário de Turmas + painel de detalhes
-- Usar no Dashboard para calcular % de carteira vs meta
+### Campo "Número de Formandos Totais" no Projeto
 
-### 2. `ClientImportModal` — Etapa 3 expandida (Vínculo por Valores Únicos)
-- Além de vincular **Projeto** por valor único da planilha, expandir para vincular **Campus**, **Curso** e **Turma** da mesma forma
-- Para cada valor único de `campus` na planilha → select de campus da instituição
-- Para cada valor único de `courseRaw` → select de curso do projeto
-- Permite importações multi-campus / multi-curso em um único arquivo
+**`types.ts`:** `totalStudents?: number` adicionado à interface `ClassRoom`.
 
-### 3. Padronização dos painéis de detalhes
+**Migration (aplicar no Supabase):**
+```sql
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS total_students INTEGER;
+```
+
+**`store.tsx` — 3 pontos:**
+- `mapClassRow`: `totalStudents: row.total_students ?? undefined`
+- `addClass`: `total_students: newClass.totalStudents ?? null`
+- `updateClass`: `total_students: updatedClass.totalStudents ?? null`
+
+**`pages/Admin/Turmas.tsx`:**
+- `ClassModal`: nova seção "Dimensionamento" com campo numérico "Nº de Formandos Totais" + `HelpTooltip`
+- Painel de detalhes: card com ícone `Users`, exibe `clientsInClass / totalStudents — XX% na carteira` e barra de progresso amber
+- `clients` adicionado ao destructure do `useData()` em `TurmasAdmin`
+
+---
+
+### `ClientImportModal` — Etapa 3 expandida (sub-vinculações por projeto)
+
+**`ColumnMap`:** novo campo `turmaRaw: string` (sub-turma dentro do projeto, sem Vínculo Direto).
+
+**Novos estados:**
+```typescript
+campusMap: Record<string, Record<string, string>> // projRaw → { campusRaw → campus.name }
+courseMap: Record<string, Record<string, string>> // projRaw → { courseRaw → courseId UUID }
+turmaMap:  Record<string, Record<string, string>> // projRaw → { turmaRaw → projectClassId UUID }
+```
+
+**Comportamentos:**
+- Ao trocar o projeto de um card → sub-maps do projeto são resetados automaticamente
+- Sub-seções aparecem dentro de cada card quando: projeto vinculado **e** coluna correspondente mapeada na Etapa 2
+- **Campus** → options: `institution.campi` do projeto vinculado
+- **Curso** → options: `courses` filtrados pelo `courseIds` do projeto
+- **Turma/Sala** → options: `projectClasses.filter(pc => pc.projectId === classId)`; select desabilitado com aviso se projeto não tem sub-turmas cadastradas
+- Projeto não vinculado → hint "Vincule o projeto para habilitar os vínculos de Campus, Curso e Turma"
+- Todos os vínculos são opcionais — se não vinculado, campo fica `null`
+
+**`handleConfirmImport` — prioridade de resolução:**
+- `campus`: `directBinds.campus` > `campusMap[projRaw][campusRaw]` > valor raw da planilha
+- `courseId`: `directBinds.courseId` > `courseMap[projRaw][courseRaw]` > auto-resolve (1 curso) > valor raw
+- `projectClassId`: `turmaMap[projRaw][turmaRaw]` — passado no payload como campo opcional
+
+**`useData()`:** `projectClasses` adicionado ao destructure no componente.
+
+---
+
+## 🗺️ Próximos passos (Sessão 20+)
+
+### 1. Testes do fluxo de importação ⬅ próxima tarefa
+- Testar `ClientImportModal` end-to-end com planilha real: upload → mapeamento → vinculação de projetos/campus/curso/turma → confirmar
+- Verificar que `projectClassId` chega corretamente no `handleBulkImport` e é tratado ou ignorado sem erro
+- Validar que a migration `total_students` foi aplicada no Supabase antes de editar projetos
+
+### 2. Padronização dos painéis de detalhes
 - Auditar todos os módulos e garantir que o padrão visual oficial (obs. #17) está consistente
 
-### 4. Responsividade mobile
+### 3. Responsividade mobile
 - Revisar os principais módulos (Dashboard, Clients, Turmas, CSDailyServices) para uso em telas < 768px
 
-### 5. Funis no Painel do Cliente (`ClientProfileView`)
+### 4. Funis no Painel do Cliente (`ClientProfileView`)
 - Exibir o funil atual do cliente com o estágio destacado
 - Permitir mover o cliente entre etapas diretamente do painel lateral
 - Mostrar histórico de movimentações de etapa na timeline
 
-### 6. Melhorias do Dashboard — 3 seções planejadas
+### 5. Melhorias do Dashboard — 3 seções planejadas
 
 **Seção A — Desempenho por Consultor**
 - Ranking de consultores por volume de vendas e taxa de conversão
@@ -1414,11 +1459,11 @@ Para cada linha vinculada:
 **Seção C — Ações CS por ROI**
 - Top 5 campanhas com maior retorno sobre investimento (tabela)
 
-### 7. Deploy das Edge Functions (pendente desde Sessão 11)
+### 6. Deploy das Edge Functions (pendente desde Sessão 11)
 - `supabase functions deploy create-user`
 - `supabase functions deploy auto-backup`
 
-### 8. Integrações futuras
+### 7. Integrações futuras
 - **WhatsApp**: integração com API (envio de mensagens a partir de atendimentos)
 - **ARES**: integração com sistema ERP para sincronização de vendas e dados de formandos
 
@@ -1515,3 +1560,7 @@ VITE_OWNER_EMAIL=<email do proprietário para notificações de reset>
     - `Clients.tsx`: troca `BulkImportModal` por `ClientImportModal`; remove `importFields`; `handleBulkImport` intocado
 
 33. **`ClientImportModal` — versão definitiva (Sessão 18):** `components/ClientImportModal.tsx` reescrito com 4 etapas dinâmicas (3 quando projeto via vínculo direto apenas). Tipos: `ColumnMap` (sem `institutionRaw`) + `DirectBinds` (com `campus: string` em vez de widget de instituição). Instituição não aparece como campo mapeável — derivada automaticamente do projeto selecionado. Campus = `institution.campi[].name` (string, não UUID), alinhado com `Client.campus: string` e `Institution.campi: Campus[]` de `types.ts`. Auto-fill: ao selecionar projeto via vínculo direto, campus preenche se `campi.length === 1` e courseId se `courseIds.length === 1`. Skip da Etapa 3: `directBinds.classId !== ''` && `columnMap.projectRaw === ''` → stepper exibe 3 etapas e avança diretamente de Colunas para Confirmar. Dois selects por campo (Coluna da Planilha + Vínculo Direto). Badge `"Valor Fixo Ativo"` quando vínculo direto está preenchido. TypeScript compila sem erros novos.
+
+34. **`ClassRoom.totalStudents` (Sessão 19):** campo `totalStudents?: number` adicionado à interface `ClassRoom` em `types.ts`. Migration: `ALTER TABLE classes ADD COLUMN IF NOT EXISTS total_students INTEGER`. `store.tsx` atualizado em 3 pontos: `mapClassRow` (deserializa `row.total_students ?? undefined`), `addClass` (envia `total_students: newClass.totalStudents ?? null`), `updateClass` (idem no update). `Turmas.tsx` — nova seção "Dimensionamento" no `ClassModal` com campo numérico "Nº de Formandos Totais" + `HelpTooltip`. Painel de detalhes exibe card com ícone `Users`, valor `clientsInClass / totalStudents — XX% na carteira` e barra de progresso amber; `clients` adicionado ao destructure do `useData()` em `TurmasAdmin`.
+
+35. **`ClientImportModal` — Etapa 3 expandida (Sessão 19):** sub-seções de vinculação por valores únicos dentro de cada card de projeto. Novo campo `turmaRaw` adicionado ao `ColumnMap` (Etapa 2, sem Vínculo Direto). Novos estados `campusMap`, `courseMap`, `turmaMap` (`Record<string, Record<string, string>>` — chave externa = raw project value, interna = raw sub-valor, valor = resolvido). Helpers `setCampusBind`, `setCourseBind`, `setTurmaBind`. Ao trocar o projeto de um card, os três sub-maps são resetados automaticamente. Sub-seções aparecem quando projeto está vinculado e a coluna correspondente foi mapeada: **Campus** → `institution.campi` do projeto; **Curso** → `courses` filtrados pelo projeto; **Turma/Sala** → `project_classes` do projeto (select desabilitado com aviso se não há sub-turmas). Todos os vínculos são opcionais. `handleConfirmImport` usa prioridade: direto > sub-map > fallback; passa `projectClassId` como campo extra no payload. `projectClasses` adicionado ao `useData()` no componente. TypeScript compila sem erros novos.

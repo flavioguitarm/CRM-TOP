@@ -31,11 +31,12 @@ type ColumnMap = {
   campus:     string; // raw campus string column
   shift:      string;
   courseRaw:  string; // course name/id column (fallback when class has >1 course)
+  turmaRaw:   string; // project_class name column (sub-turma within a project)
 };
 
 const EMPTY_MAP: ColumnMap = {
   projectRaw: '', name: '', phone: '', email: '', cpf: '',
-  birthDate: '', gender: '', tags: '', campus: '', shift: '', courseRaw: '',
+  birthDate: '', gender: '', tags: '', campus: '', shift: '', courseRaw: '', turmaRaw: '',
 };
 
 /**
@@ -100,6 +101,9 @@ const FIELD_SECTIONS: FieldSection[] = [
         key: 'courseRaw', label: 'Curso', Icon: BookOpen,
         directBindKey: 'courseId',
       },
+      { key: 'turmaRaw', label: 'Turma / Sala', Icon: Users,
+        hint: 'Sub-turma dentro do projeto (ex: Turma A, T1). Vinculada em Etapa 3.',
+      },
       { key: 'shift', label: 'Turno', Icon: Clock },
     ],
   },
@@ -135,7 +139,7 @@ export interface ClientImportModalProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose }) => {
-  const { classes, institutions, courses } = useData();
+  const { classes, institutions, courses, projectClasses } = useData();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [step,           setStep]           = useState<Step>('upload');
@@ -145,7 +149,11 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
   const [isDragging,     setIsDragging]     = useState(false);
   const [columnMap,      setColumnMap]      = useState<ColumnMap>(EMPTY_MAP);
   const [directBinds,    setDirectBinds]    = useState<DirectBinds>(EMPTY_DIRECT);
-  const [projectMap,     setProjectMap]     = useState<Record<string, string>>({}); // rawValue → classId
+  const [projectMap,     setProjectMap]     = useState<Record<string, string>>({}); // rawProjectVal → classId
+  // Sub-binding maps: outer key = rawProjectVal, inner key = raw column value, inner value = resolved system value
+  const [campusMap,      setCampusMap]      = useState<Record<string, Record<string, string>>>({});
+  const [courseMap,      setCourseMap]      = useState<Record<string, Record<string, string>>>({});
+  const [turmaMap,       setTurmaMap]       = useState<Record<string, Record<string, string>>>({});
   const [importStrategy, setImportStrategy] = useState<'ignore' | 'overwrite'>('ignore');
   const [importing,      setImporting]      = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -270,6 +278,9 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
         setColumnMap(EMPTY_MAP);
         setDirectBinds(EMPTY_DIRECT);
         setProjectMap({});
+        setCampusMap({});
+        setCourseMap({});
+        setTurmaMap({});
         setStep('mapping');
       } catch (err) {
         console.error(err);
@@ -324,8 +335,22 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
     }
   };
 
-  const setProject = (rawValue: string, classId: string) =>
+  const setProject = (rawValue: string, classId: string) => {
     setProjectMap(prev => ({ ...prev, [rawValue]: classId }));
+    // Reset sub-bindings when the project selection changes
+    setCampusMap(prev => { const n = { ...prev }; delete n[rawValue]; return n; });
+    setCourseMap(prev => { const n = { ...prev }; delete n[rawValue]; return n; });
+    setTurmaMap(prev  => { const n = { ...prev }; delete n[rawValue]; return n; });
+  };
+
+  const setCampusBind = (projectRaw: string, rawVal: string, resolved: string) =>
+    setCampusMap(prev => ({ ...prev, [projectRaw]: { ...prev[projectRaw], [rawVal]: resolved } }));
+
+  const setCourseBind = (projectRaw: string, rawVal: string, resolved: string) =>
+    setCourseMap(prev => ({ ...prev, [projectRaw]: { ...prev[projectRaw], [rawVal]: resolved } }));
+
+  const setTurmaBind = (projectRaw: string, rawVal: string, resolved: string) =>
+    setTurmaMap(prev => ({ ...prev, [projectRaw]: { ...prev[projectRaw], [rawVal]: resolved } }));
 
   const goBack = () => {
     if (step === 'preview' && skipProjectsStep) { setStep('mapping'); return; }
@@ -351,19 +376,27 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
   const handleConfirmImport = async () => {
     setImporting(true);
     const cleanRows: any[] = linkedRows.map(row => {
-      const rawVal  = columnMap.projectRaw ? String(row[columnMap.projectRaw] ?? '').trim() : '';
-      const classId = (rawVal ? projectMap[rawVal] : '') || directBinds.classId;
-      const cls     = classes.find(c => c.id === classId);
+      const rawProjectVal = columnMap.projectRaw ? String(row[columnMap.projectRaw] ?? '').trim() : '';
+      const classId       = (rawProjectVal ? projectMap[rawProjectVal] : '') || directBinds.classId;
+      const cls           = classes.find(c => c.id === classId);
 
-      // campus: prefer direct bind, then column value
-      const campusVal = directBinds.campus
-        || (columnMap.campus ? String(row[columnMap.campus] ?? '').trim() : '');
+      // campus: direct bind > step-3 mapping > raw column value
+      const rawCampusVal = columnMap.campus ? String(row[columnMap.campus] ?? '').trim() : '';
+      const campusVal    = directBinds.campus
+        || campusMap[rawProjectVal]?.[rawCampusVal]
+        || rawCampusVal;
 
-      // courseId: prefer directBind, then class single-course auto-resolve, then column raw value
-      const courseIdVal =
-        directBinds.courseId ||
-        (cls?.courseIds.length === 1 ? cls.courseIds[0] : '') ||
-        (columnMap.courseRaw ? String(row[columnMap.courseRaw] ?? '').trim() : '');
+      // courseId: direct bind > step-3 mapping > single-course auto-resolve > raw (may already be UUID)
+      const rawCourseVal = columnMap.courseRaw ? String(row[columnMap.courseRaw] ?? '').trim() : '';
+      const courseIdVal  =
+        directBinds.courseId
+        || courseMap[rawProjectVal]?.[rawCourseVal]
+        || (cls?.courseIds.length === 1 ? cls.courseIds[0] : '')
+        || rawCourseVal;
+
+      // projectClassId: step-3 mapping only (no direct bind)
+      const rawTurmaVal    = columnMap.turmaRaw ? String(row[columnMap.turmaRaw] ?? '').trim() : '';
+      const projectClassId = turmaMap[rawProjectVal]?.[rawTurmaVal] || '';
 
       return {
         name:          columnMap.name      ? String(row[columnMap.name]      ?? '').trim() : '',
@@ -378,6 +411,7 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
         classId,
         institutionId: cls?.institutionId ?? directBinds.institutionId,
         courseId:      courseIdVal,
+        projectClassId: projectClassId || undefined,
       };
     }).filter(r => r.name);
 
@@ -763,39 +797,52 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {uniqueProjectValues.map(rawValue => {
               const selectedClassId = projectMap[rawValue] ?? '';
-              const resolved        = selectedClassId
-                ? classes.find(c => c.id === selectedClassId)
-                : null;
+              const resolved        = selectedClassId ? classes.find(c => c.id === selectedClassId) : null;
               const fallback        = !selectedClassId && hasDirectClass ? directClass : null;
               const displayClass    = resolved ?? fallback;
-              const displayInst     = displayClass
-                ? institutions.find(i => i.id === displayClass.institutionId)
-                : null;
-              const displayCourses  = displayClass
-                ? courses.filter(c => displayClass.courseIds.includes(c.id)).map(c => c.name).join(', ')
-                : null;
-              const displayCampi    = displayInst
-                ? displayInst.campi.map(c => c.name).join(', ')
-                : null;
-              const rowCount        = fileData.filter(
-                r => String(r[columnMap.projectRaw] ?? '').trim() === rawValue,
-              ).length;
+              const displayInst     = displayClass ? institutions.find(i => i.id === displayClass.institutionId) : null;
+              const displayCourses  = displayClass ? courses.filter(c => displayClass.courseIds.includes(c.id)).map(c => c.name).join(', ') : null;
+              const displayCampi    = displayInst ? displayInst.campi.map(c => c.name).join(', ') : null;
+              const rowCount        = fileData.filter(r => String(r[columnMap.projectRaw] ?? '').trim() === rawValue).length;
               const isDefault = !selectedClassId && hasDirectClass;
               const isLinked  = !!selectedClassId;
+
+              // Sub-binding: unique values of each sub-column for rows of this project
+              const rowsForProject = fileData.filter(r => String(r[columnMap.projectRaw] ?? '').trim() === rawValue);
+
+              const uniqueCampusVals: string[] = columnMap.campus
+                ? Array.from(new Set<string>(rowsForProject.map(r => String(r[columnMap.campus] ?? '').trim()).filter((v): v is string => v !== ''))).sort()
+                : [];
+              const uniqueCourseVals: string[] = columnMap.courseRaw
+                ? Array.from(new Set<string>(rowsForProject.map(r => String(r[columnMap.courseRaw] ?? '').trim()).filter((v): v is string => v !== ''))).sort()
+                : [];
+              const uniqueTurmaVals: string[] = columnMap.turmaRaw
+                ? Array.from(new Set<string>(rowsForProject.map(r => String(r[columnMap.turmaRaw] ?? '').trim()).filter((v): v is string => v !== ''))).sort()
+                : [];
+
+              const hasSubBindings = (isLinked || isDefault) && displayClass && (
+                uniqueCampusVals.length > 0 || uniqueCourseVals.length > 0 || uniqueTurmaVals.length > 0
+              );
+
+              // Options for sub-binding selects
+              const instCampiOptions   = displayInst ? displayInst.campi.map(c => c.name) : [];
+              const clsCoursesOptions  = displayClass ? courses.filter(c => displayClass.courseIds.includes(c.id)) : [];
+              const clsProjectClasses  = displayClass ? projectClasses.filter(pc => pc.projectId === displayClass.id) : [];
 
               return (
                 <div
                   key={rawValue}
-                  className={`rounded-[1.5rem] border p-5 transition-all ${
+                  className={`rounded-[1.5rem] border transition-all ${
                     isLinked  ? 'border-emerald-200 bg-emerald-50/20'
                     : isDefault ? 'border-amber-200 bg-amber-50/20'
                     :             'border-slate-200 bg-white hover:border-amber-200'
                   }`}
                 >
-                  <div className="flex items-start gap-4">
+                  {/* ── Project header row ── */}
+                  <div className="p-5 flex items-start gap-4">
                     {/* Status icon */}
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                       isLinked  ? 'bg-emerald-100 text-emerald-600'
@@ -812,9 +859,7 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
                       </p>
                       <p className="text-sm font-black text-slate-900 truncate">{rawValue}</p>
                       {isDefault && (
-                        <p className="text-[9px] font-bold text-amber-600 mt-0.5">
-                          Padrão: {directClass?.name}
-                        </p>
+                        <p className="text-[9px] font-bold text-amber-600 mt-0.5">Padrão: {directClass?.name}</p>
                       )}
                       {displayClass && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
@@ -859,6 +904,145 @@ const ClientImportModal: React.FC<ClientImportModalProps> = ({ onImport, onClose
                       </select>
                     </div>
                   </div>
+
+                  {/* ── Sub-binding sections (campus / curso / turma) ── */}
+                  {hasSubBindings && (
+                    <div className="border-t border-dashed border-slate-200 mx-5 mb-5 pt-4 space-y-4">
+
+                      {/* CAMPUS */}
+                      {uniqueCampusVals.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <Building2 size={10} className="text-slate-400" /> Campus
+                            {instCampiOptions.length === 0 && (
+                              <span className="text-rose-400 font-bold normal-case tracking-normal ml-1">
+                                — instituição sem campi cadastrados
+                              </span>
+                            )}
+                          </p>
+                          <div className="space-y-1.5">
+                            {uniqueCampusVals.map(campusRaw => {
+                              const resolved = campusMap[rawValue]?.[campusRaw] ?? '';
+                              return (
+                                <div key={campusRaw} className="flex items-center gap-3">
+                                  <span className="text-[10px] font-black text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 min-w-[140px] truncate shrink-0">
+                                    "{campusRaw}"
+                                  </span>
+                                  <ArrowRight size={12} className="text-slate-300 flex-shrink-0" />
+                                  <select
+                                    value={resolved}
+                                    onChange={e => setCampusBind(rawValue, campusRaw, e.target.value)}
+                                    className={`flex-1 border rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all ${
+                                      resolved ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500'
+                                    }`}
+                                  >
+                                    <option value="">— Não vincular —</option>
+                                    {instCampiOptions.map(name => (
+                                      <option key={name} value={name}>{name}</option>
+                                    ))}
+                                  </select>
+                                  {resolved && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CURSO */}
+                      {uniqueCourseVals.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <BookOpen size={10} className="text-slate-400" /> Curso
+                            {clsCoursesOptions.length === 0 && (
+                              <span className="text-rose-400 font-bold normal-case tracking-normal ml-1">
+                                — projeto sem cursos vinculados
+                              </span>
+                            )}
+                          </p>
+                          <div className="space-y-1.5">
+                            {uniqueCourseVals.map(courseRaw => {
+                              const resolved = courseMap[rawValue]?.[courseRaw] ?? '';
+                              return (
+                                <div key={courseRaw} className="flex items-center gap-3">
+                                  <span className="text-[10px] font-black text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 min-w-[140px] truncate shrink-0">
+                                    "{courseRaw}"
+                                  </span>
+                                  <ArrowRight size={12} className="text-slate-300 flex-shrink-0" />
+                                  <select
+                                    value={resolved}
+                                    onChange={e => setCourseBind(rawValue, courseRaw, e.target.value)}
+                                    className={`flex-1 border rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all ${
+                                      resolved ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500'
+                                    }`}
+                                  >
+                                    <option value="">— Não vincular —</option>
+                                    {clsCoursesOptions.map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                  {resolved && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TURMA (project_classes) */}
+                      {uniqueTurmaVals.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <Users size={10} className="text-slate-400" /> Turma / Sala
+                            {clsProjectClasses.length === 0 && (
+                              <span className="text-amber-500 font-bold normal-case tracking-normal ml-1">
+                                — nenhuma sub-turma cadastrada para este projeto
+                              </span>
+                            )}
+                          </p>
+                          <div className="space-y-1.5">
+                            {uniqueTurmaVals.map(turmaRaw => {
+                              const resolved = turmaMap[rawValue]?.[turmaRaw] ?? '';
+                              return (
+                                <div key={turmaRaw} className="flex items-center gap-3">
+                                  <span className="text-[10px] font-black text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 min-w-[140px] truncate shrink-0">
+                                    "{turmaRaw}"
+                                  </span>
+                                  <ArrowRight size={12} className="text-slate-300 flex-shrink-0" />
+                                  <select
+                                    value={resolved}
+                                    disabled={clsProjectClasses.length === 0}
+                                    onChange={e => setTurmaBind(rawValue, turmaRaw, e.target.value)}
+                                    className={`flex-1 border rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 transition-all ${
+                                      resolved ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                      : clsProjectClasses.length === 0 ? 'bg-slate-50 border-slate-100 text-slate-400 opacity-50 cursor-not-allowed'
+                                      : 'bg-white border-slate-200 text-slate-500'
+                                    }`}
+                                  >
+                                    <option value="">— Não vincular —</option>
+                                    {clsProjectClasses.map(pc => (
+                                      <option key={pc.id} value={pc.id}>{pc.name}</option>
+                                    ))}
+                                  </select>
+                                  {resolved && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  )}
+
+                  {/* Hint: project not linked yet, sub-bindings unavailable */}
+                  {!isLinked && !isDefault && (columnMap.campus || columnMap.courseRaw || columnMap.turmaRaw) && (
+                    <div className="px-5 pb-4">
+                      <p className="text-[9px] font-bold text-slate-400 italic">
+                        Vincule o projeto acima para habilitar os vínculos de Campus, Curso e Turma.
+                      </p>
+                    </div>
+                  )}
                 </div>
               );
             })}
