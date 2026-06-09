@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Client, ClassRoom, Campus, Sale, ProductNegotiation } from '../types';
 import ClientProfileView from '../components/ClientProfileView';
-import BulkImportModal from '../components/BulkImportModal';
+import ClientImportModal from '../components/ClientImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import HelpTooltip from '../components/HelpTooltip';
 import { usePermissions } from '../src/hooks/usePermissions';
@@ -582,25 +582,6 @@ const ClientsView: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-  const importFields = [
-    { key: 'name', label: 'Nome Completo', required: true },
-    { key: 'email', label: 'E-mail' },
-    { key: 'phone', label: 'Telefone' },
-    { key: 'cpf', label: 'CPF' },
-    { key: 'birthDate', label: 'Nascimento (AAAA-MM-DD)' },
-    { key: 'gender', label: 'Gênero' },
-    { key: 'tags', label: 'Etiquetas (sep. vírgula)' },
-    { key: 'institutionId', label: 'Instituição (nome ou ID)' },
-    { key: 'courseId', label: 'Curso (nome ou ID)' },
-    { key: 'classId', label: 'Projeto (nome ou ID) — preenche inst. e curso automaticamente' },
-    { key: 'shift', label: 'Turno' }, 
-    { key: 'soldProductId', label: 'ID do Produto Vendido' },
-    { key: 'soldValue', label: 'Valor da Venda (Ex: 4500.50)' },
-    { key: 'quantity', label: 'Quantidade' },
-    { key: 'soldDate', label: 'Data da Venda (AAAA-MM-DD)' },
-    { key: 'lostDate', label: 'Data da Perda (AAAA-MM-DD)' },
-  ];
-
   return (
     <div className="h-full flex gap-6 overflow-hidden">
       <div className={`flex-1 flex flex-col gap-6 transition-all ${selectedClientId ? 'w-1/2' : 'w-full'}`}>
@@ -730,11 +711,9 @@ const ClientsView: React.FC = () => {
       {isModalOpen && <ClientModal client={clientToEdit} onClose={() => setIsModalOpen(false)} onSave={(data) => { if (clientToEdit) updateClient({...clientToEdit, ...data} as Client); else addClient({...data, id: crypto.randomUUID(), activities: []} as Client); setIsModalOpen(false); }} />}
       
       {isImportModalOpen && (
-        <BulkImportModal 
-          title="Clientes"
-          fields={importFields} 
-          onClose={() => setIsImportModalOpen(false)} 
-          onImport={handleBulkImport} 
+        <ClientImportModal
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleBulkImport}
         />
       )}
 
